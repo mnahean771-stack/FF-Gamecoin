@@ -1,10 +1,10 @@
 // =======================================================
 // WEBSITE NAME (NICKNAME)
 // =======================================================
-var website_name = "YASIN";
+var website_name = "FF Gamecoin";
 
 // =======================================================
-// TELEGRAM CHANNEL LINK
+// TELEGRAM CHANNEL LINKa
 // =======================================================
 var telegram_channel_link = "telegram channel link";
 
