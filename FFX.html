@@ -2616,5 +2616,224 @@ setInterval(fetchFreshAccountConfig, 15000);
   });
 })();
 </script>
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyAVfTb4qyBe6JDWgjEQvU08zgyEo8bzBzI",
+  authDomain: "ff-gamecoine.firebaseapp.com",
+  projectId: "ff-gamecoine",
+  appId: "1:740420310239:web:040a656b504ebd7e5cc56a"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* ---------- স্টাইল ---------- */
+const st = document.createElement('style');
+st.textContent = `
+#ffAuth{position:fixed;inset:0;z-index:9999;background:var(--bg,#f5f8ff);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 32px}
+#ffAuth[hidden]{display:none}
+#ffAuth .ffc{max-width:440px;margin:0 auto;background:#fff;border:1.5px solid var(--bd,#e1e8f5);border-radius:22px;padding:22px 20px;box-shadow:0 16px 36px -16px rgba(37,99,235,.35);position:relative}
+#ffAuth .ffx{position:absolute;top:12px;right:14px;width:36px;height:36px;border:0;border-radius:50%;background:#eff6ff;color:#2563eb;font-size:20px;cursor:pointer}
+#ffAuth .fflogo{display:block;height:46px;margin:0 auto 8px;object-fit:contain}
+#ffAuth h2{font-size:26px;margin:6px 0 14px}
+#ffAuth .ffg{width:100%;height:50px;border:1.5px solid var(--bd,#e1e8f5);border-radius:14px;background:#fff;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;color:#0f172a}
+#ffAuth .ffor{display:flex;align-items:center;gap:10px;margin:16px 0 6px;color:#666b85;font-size:13px}
+#ffAuth .ffor:before,#ffAuth .ffor:after{content:"";flex:1;height:1px;background:var(--bd,#e1e8f5)}
+#ffAuth label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}
+#ffAuth input{width:100%;height:50px;border:1.5px solid var(--bd,#e1e8f5);border-radius:14px;padding:0 14px;font-size:16px;outline:0;background:#fff;color:#0f172a}
+#ffAuth input:focus{border-color:#3b82f6}
+#ffAuth .ffp{width:100%;height:52px;margin-top:18px;border:0;border-radius:14px;background:var(--g,linear-gradient(135deg,#3b82f6,#1d4ed8));color:#fff;font-size:17px;font-weight:700;cursor:pointer}
+#ffAuth button:disabled{opacity:.6}
+#ffAuth .ffe{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:14px}
+#ffAuth .ffs{text-align:center;margin-top:16px;font-size:14px}
+#ffAuth .ffs a{color:#2563eb;font-weight:700;cursor:pointer}
+`;
+document.head.appendChild(st);
+
+/* ---------- লগইন ও রেজিস্টার পেজ ---------- */
+const G = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
+const box = document.createElement('div');
+box.id = 'ffAuth'; box.hidden = true;
+box.innerHTML = `
+<div class="ffc" id="ffLogin">
+  <button class="ffx" type="button" data-close>✕</button>
+  <img class="fflogo" src="Main logo.jpg" alt="">
+  <h2>Login</h2>
+  <button class="ffg" type="button" id="lgGoogle">${G}<span>Login with Google</span></button>
+  <div class="ffor">অথবা ইমেইল দিয়ে লগইন করুন</div>
+  <label>ইমেইল</label><input id="lgEmail" type="email" placeholder="Email" autocomplete="email">
+  <label>পাসওয়ার্ড</label><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password">
+  <div class="ffe" id="lgErr"></div>
+  <button class="ffp" type="button" id="lgBtn">Login</button>
+  <div class="ffs">নতুন ইউজার? <a data-go="register">রেজিস্টার করুন</a></div>
+</div>
+<div class="ffc" id="ffReg" hidden>
+  <button class="ffx" type="button" data-close>✕</button>
+  <img class="fflogo" src="Main logo.jpg" alt="">
+  <h2>Register</h2>
+  <button class="ffg" type="button" id="rgGoogle">${G}<span>Login with Google</span></button>
+  <div class="ffor">অথবা ইমেইল দিয়ে রেজিস্টার করুন</div>
+  <label>নাম</label><input id="rgName" type="text" placeholder="Name" autocomplete="name">
+  <label>ফোন নাম্বার</label><input id="rgPhone" type="tel" placeholder="01XXXXXXXXX" autocomplete="tel">
+  <label>ইমেইল</label><input id="rgEmail" type="email" placeholder="Email" autocomplete="email">
+  <label>পাসওয়ার্ড</label><input id="rgPass" type="password" placeholder="Password (কমপক্ষে ৬ অক্ষর)" autocomplete="new-password">
+  <label>পাসওয়ার্ড আবার দিন</label><input id="rgPass2" type="password" placeholder="Confirm Password" autocomplete="new-password">
+  <div class="ffe" id="rgErr"></div>
+  <button class="ffp" type="button" id="rgBtn">Register</button>
+  <div class="ffs">আগে থেকেই একাউন্ট আছে? <a data-go="login">Login করুন</a></div>
+</div>`;
+document.body.appendChild(box);
+const $ = id => document.getElementById(id);
+
+function openAuth(which) {
+  $('ffLogin').hidden = which !== 'login';
+  $('ffReg').hidden = which !== 'register';
+  box.hidden = false; box.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+}
+function closeAuth() { box.hidden = true; document.body.style.overflow = ''; }
+box.addEventListener('click', e => {
+  if (e.target.closest('[data-close]')) closeAuth();
+  const g = e.target.closest('[data-go]');
+  if (g) openAuth(g.getAttribute('data-go'));
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !box.hidden) closeAuth(); });
+box.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const card = e.target.closest('.ffc');
+  if (card) card.querySelector('.ffp').click();
+});
+
+/* ---------- সাহায্যকারী ফাংশন ---------- */
+function showErr(el, m) { el.textContent = m; el.style.display = m ? 'block' : 'none'; }
+function errMsg(e) {
+  const m = {
+    'auth/invalid-credential': 'ইমেইল বা পাসওয়ার্ড ভুল',
+    'auth/wrong-password': 'ইমেইল বা পাসওয়ার্ড ভুল',
+    'auth/user-not-found': 'এই ইমেইলে কোনো একাউন্ট নেই',
+    'auth/invalid-email': 'ইমেইলটি সঠিক নয়',
+    'auth/email-already-in-use': 'এই ইমেইল দিয়ে আগেই একাউন্ট খোলা হয়েছে',
+    'auth/weak-password': 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন',
+    'auth/too-many-requests': 'অনেকবার চেষ্টা হয়েছে, একটু পরে আবার করুন',
+    'auth/network-request-failed': 'ইন্টারনেট সংযোগ চেক করুন',
+    'auth/popup-blocked': 'পপআপ ব্লক হয়েছে, ব্রাউজারে পপআপ Allow করুন',
+    'auth/unauthorized-domain': 'এই ডোমেইন Firebase-এ অনুমোদিত নয়'
+  };
+  return m[e && e.code] || 'কিছু একটা ভুল হয়েছে, আবার চেষ্টা করুন';
+}
+function setFlag(v) { try { v ? localStorage.setItem('ff_logged', '1') : localStorage.removeItem('ff_logged'); } catch (e) {} }
+function getFlag() { try { return localStorage.getItem('ff_logged') === '1'; } catch (e) { return false; } }
+function reloadOnce() {
+  try {
+    if (sessionStorage.getItem('ff_rl') === '1') { sessionStorage.removeItem('ff_rl'); return; }
+    sessionStorage.setItem('ff_rl', '1');
+  } catch (e) { return; }
+  location.reload();
+}
+function done() { setFlag(true); location.hash = ''; location.reload(); }
+
+async function saveUser(u, extra) {
+  try {
+    const ref = doc(db, 'users', u.uid);
+    const s = await getDoc(ref);
+    if (!s.exists()) {
+      await setDoc(ref, {
+        name: extra.name || u.displayName || '',
+        phone: extra.phone || '',
+        email: u.email || '',
+        balance: 0,
+        createdAt: serverTimestamp()
+      });
+    }
+  } catch (e) { console.warn('database:', e); }
+}
+
+/* ---------- গুগল লগইন (লগইন ও রেজিস্টার দুই পেজেই) ---------- */
+async function googleFlow(btn, errEl) {
+  showErr(errEl, ''); btn.disabled = true;
+  try {
+    const p = new GoogleAuthProvider();
+    p.setCustomParameters({ prompt: 'select_account' });
+    const r = await signInWithPopup(auth, p);
+    await saveUser(r.user, {});
+    done();
+  } catch (e) {
+    if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') showErr(errEl, errMsg(e));
+    btn.disabled = false;
+  }
+}
+$('lgGoogle').onclick = () => googleFlow($('lgGoogle'), $('lgErr'));
+$('rgGoogle').onclick = () => googleFlow($('rgGoogle'), $('rgErr'));
+
+/* ---------- ইমেইল লগইন ---------- */
+$('lgBtn').onclick = async () => {
+  const em = $('lgEmail').value.trim(), pw = $('lgPass').value;
+  if (!em || !pw) return showErr($('lgErr'), 'ইমেইল আর পাসওয়ার্ড দিন');
+  showErr($('lgErr'), ''); $('lgBtn').disabled = true;
+  try { await signInWithEmailAndPassword(auth, em, pw); done(); }
+  catch (e) { showErr($('lgErr'), errMsg(e)); $('lgBtn').disabled = false; }
+};
+
+/* ---------- রেজিস্টার ---------- */
+$('rgBtn').onclick = async () => {
+  const name = $('rgName').value.trim(), phone = $('rgPhone').value.trim().replace(/[\s-]/g, '');
+  const em = $('rgEmail').value.trim(), pw = $('rgPass').value, pw2 = $('rgPass2').value;
+  const er = $('rgErr');
+  if (!name) return showErr(er, 'আপনার নাম দিন');
+  if (!/^(\+?88)?01[3-9]\d{8}$/.test(phone)) return showErr(er, 'সঠিক ফোন নাম্বার দিন (যেমন 01712345678)');
+  if (!em) return showErr(er, 'ইমেইল দিন');
+  if (pw.length < 6) return showErr(er, 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের দিন');
+  if (pw !== pw2) return showErr(er, 'দুইটা পাসওয়ার্ড মিলছে না');
+  showErr(er, ''); $('rgBtn').disabled = true;
+  try {
+    const r = await createUserWithEmailAndPassword(auth, em, pw);
+    try { await updateProfile(r.user, { displayName: name }); } catch (e) {}
+    await saveUser(r.user, { name, phone });
+    done();
+  } catch (e) { showErr(er, errMsg(e)); $('rgBtn').disabled = false; }
+};
+
+/* ---------- সাইটের Login / Logout বাটন ধরা ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('.btn.login, #accLo, #acLogout');
+  if (!t) return;
+  const isOut = t.id === 'accLo' || t.id === 'acLogout';
+  const logged = !!auth.currentUser || getFlag();
+  if (logged) {
+    if (isOut) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      signOut(auth).then(() => { setFlag(false); location.hash = ''; location.reload(); });
+    }
+    return;
+  }
+  e.preventDefault(); e.stopImmediatePropagation();
+  openAuth('login');
+}, true);
+
+/* ---------- লগইন অবস্থা অনুযায়ী সাইট আপডেট ---------- */
+onAuthStateChanged(auth, async u => {
+  const flag = getFlag();
+  if (u && !flag) { setFlag(true); reloadOnce(); return; }
+  if (!u && flag) { setFlag(false); reloadOnce(); return; }
+  try { sessionStorage.removeItem('ff_rl'); } catch (e) {}
+  if (!u) return;
+  let bal = 0;
+  try { const s = await getDoc(doc(db, 'users', u.uid)); if (s.exists()) bal = s.data().balance || 0; } catch (e) {}
+  const name = u.displayName || (u.email || '').split('@')[0];
+  if (window.setProfile) window.setProfile({
+    loggedIn: true, name, email: u.email || '', verified: false,
+    balance: bal, orders: 0, codes: 0, avatar: u.photoURL || ''
+  });
+  const n = $('accName'); if (n) n.textContent = 'Hi, ' + name;
+  const m = $('accMail'); if (m) m.textContent = u.email || '';
+  const lo = document.querySelector('#accLo span'); if (lo) lo.textContent = 'Logout';
+});
+  </script>
 </body>
 </html>
