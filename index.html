@@ -3021,6 +3021,54 @@ onAuthStateChanged(auth, async u => {
   const lo = document.querySelector('#accLo span'); if (lo) lo.textContent = 'Logout';
 });
 </script>
+  <script>
+(function(){
+  // এখানে তোমার নিজের নম্বর বসাও
+  var NUMBERS = { 'bKash':'01XXXXXXXXX', 'Nagad':'01XXXXXXXXX', 'Rocket':'01XXXXXXXXX' };
+
+  var view=document.getElementById('amView'), home=document.getElementById('homeView'), foot=document.getElementById('siteFooter');
+  var s1=document.getElementById('amStep1'), s2=document.getElementById('amStep2'), s3=document.getElementById('amStep3');
+  var method='', amount=0;
+  function toast(m){var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show')},2400);}
+  function step(n){ s1.hidden=n!==1; s2.hidden=n!==2; s3.hidden=n!==3; }
+  function route(){
+    var on = location.hash==='#add-money';
+    view.hidden=!on;
+    if(on){
+      document.querySelectorAll('main, section').forEach(function(el){ if(el!==view && el.id && el.id.indexOf('View')>-1) el.hidden=true; });
+      if(home) home.hidden=true; if(foot) foot.hidden=true;
+      step(1); window.scrollTo(0,0);
+    } else if(home && location.hash==='') { home.hidden=false; if(foot) foot.hidden=false; }
+  }
+  function open(e){ e.preventDefault(); e.stopImmediatePropagation(); location.hash='add-money'; var p=document.getElementById('accPanel'); if(p){p.classList.remove('show');p.setAttribute('aria-hidden','true');document.body.style.overflow='';} route(); }
+  var navAdd=document.querySelector('nav.nav a.add'); if(navAdd) navAdd.addEventListener('click',open,true);
+  var accAdd=document.querySelector('.acc-it[data-go="addmoney"]'); if(accAdd) accAdd.addEventListener('click',open,true);
+  var acAdd=document.getElementById('acAdd'); if(acAdd) acAdd.addEventListener('click',open,true);
+
+  document.getElementById('amBack').onclick=function(){ if(!s1.hidden){ location.hash=''; route(); } else if(!s2.hidden){ step(1); } else { step(2); } };
+  document.querySelectorAll('.am-opt').forEach(function(b){ b.onclick=function(){ method=b.dataset.m; step(2); }; });
+  document.getElementById('amNext').onclick=function(){
+    amount=parseInt(document.getElementById('amAmt').value,10);
+    if(!amount||amount<10||amount>50000){ toast('১০ থেকে ৪০০০০ টাকার মধ্যে দিন'); return; }
+    document.getElementById('amMName').textContent=method;
+    document.getElementById('amTk').textContent=amount;
+    document.getElementById('amNumber').textContent=NUMBERS[method];
+    step(3);
+  };
+  document.getElementById('amCopy').onclick=function(){
+    var v=NUMBERS[method];
+    if(navigator.clipboard){ navigator.clipboard.writeText(v).then(function(){toast('নম্বর কপি হয়েছে')},function(){toast(v)}); } else toast(v);
+  };
+  document.getElementById('amVerify').onclick=function(){
+    var trx=document.getElementById('amTrx').value.trim();
+    if(trx.length<6){ toast('সঠিক ট্রানজ্যাকশন আইডি দিন'); return; }
+    // আপাতত: ভেরিফাই অটো নয়, তাই শুধু জানিয়ে দেওয়া হচ্ছে
+    toast('আপনার অনুরোধ পাওয়া গেছে, ভেরিফাই হলে ব্যালেন্স যোগ হবে');
+  };
+  window.addEventListener('hashchange',route);
+  route();
+})();
+  </script>
 </body>
 </html>
 
