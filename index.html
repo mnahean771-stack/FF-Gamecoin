@@ -1881,7 +1881,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var home=document.getElementById('homeView'), ff=document.getElementById('ffView'), foot=document.getElementById('siteFooter');
@@ -1952,7 +1952,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var BALANCE=0;          // ইউজারের ওয়ালেট ব্যালেন্স (ব্যাকএন্ড থেকে বসান)
@@ -2035,7 +2035,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var BALANCE=0;          // ইউজারের ওয়ালেট ব্যালেন্স (ব্যাকএন্ড থেকে বসান)
@@ -2118,7 +2118,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var BALANCE=0;          // ইউজারের ওয়ালেট ব্যালেন্স (ব্যাকএন্ড থেকে বসান)
@@ -2201,7 +2201,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var BALANCE=0;          // ইউজারের ওয়ালেট ব্যালেন্স (ব্যাকএন্ড থেকে বসান)
@@ -2284,7 +2284,7 @@ setInterval(fetchFreshAccountConfig, 15000);
 // ==========================================
 (function(){
   // লগইন সিস্টেম যুক্ত করলে এটা true করে দিন
-  var isLoggedIn=false;
+  var isLoggedIn = (function(){ try { return localStorage.getItem('ff_logged') === '1'; } catch(e){ return false; } })();
   var LOGIN_URL='#';
 
   var BALANCE=0;          // ইউজারের ওয়ালেট ব্যালেন্স (ব্যাকএন্ড থেকে বসান)
