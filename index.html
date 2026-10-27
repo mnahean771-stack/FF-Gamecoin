@@ -654,6 +654,25 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
 .ac-mi.out{color:#b42318}
 .ac-mi.out .mi{background:#fee4e2;color:#b42318}
 </style>
+  <style>
+#amView[hidden]{display:none}
+#amView{padding:16px 14px 110px;max-width:480px;margin:0 auto}
+.am-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.am-head h2{margin:0;font-size:20px}
+.am-head p{margin:2px 0 0;font-size:13px;color:#667}
+.am-back{width:40px;height:40px;border:0;border-radius:12px;background:#eaf1ff;color:#2563eb;font-size:20px;cursor:pointer}
+.am-card{background:#fff;border:1.5px solid #e1e8f5;border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 10px 24px -16px rgba(37,99,235,.4)}
+.am-card[hidden]{display:none}
+.am-card h3{margin:0 0 10px;font-size:17px}
+.am-lim{font-size:13px;color:#556;margin:0 0 10px}
+.am-opt{display:block;width:100%;text-align:left;padding:14px;margin-bottom:10px;border:1.5px solid #e1e8f5;border-radius:14px;background:#fff;font-size:16px;font-weight:700;cursor:pointer}
+.am-card input{width:100%;height:50px;border:1.5px solid #e1e8f5;border-radius:14px;padding:0 14px;font-size:16px;box-sizing:border-box;margin-bottom:12px}
+.am-card label{display:block;font-weight:700;font-size:14px;margin:12px 0 6px}
+.am-btn{width:100%;height:52px;border:0;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-size:17px;font-weight:700;cursor:pointer}
+.am-num{display:flex;align-items:center;justify-content:space-between;background:#eff6ff;border-radius:14px;padding:12px 14px;font-weight:800;font-size:18px}
+.am-num button{border:0;border-radius:10px;background:#2563eb;color:#fff;padding:8px 14px;font-weight:700;cursor:pointer}
+.am-steps{padding-left:20px;font-size:14px;line-height:1.7;color:#334}
+  </style>
 </head>
 <body>
 
@@ -1279,7 +1298,47 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
     <button class="ac-mi out" type="button" id="acLogout"><span class="mi"><svg class="i"><use href="#a-in"/></svg></span><span id="acLoTx">Login</span><svg class="i go"><use href="#arr"/></svg></button>
   </nav>
 </main>
+<section id="amView" hidden>
+  <div class="am-wrap">
+    <div class="am-head">
+      <button type="button" id="amBack" class="am-back">←</button>
+      <div>
+        <h2>ওয়ালেটে টাকা যোগ করুন</h2>
+        <p id="amSub">আগে পেমেন্ট মাধ্যম বেছে নিন</p>
+      </div>
+    </div>
 
+    <div class="am-card" id="amStep1">
+      <h3>কোন মাধ্যমে পাঠাবেন?</h3>
+      <button type="button" class="am-opt" data-m="bKash">bKash</button>
+      <button type="button" class="am-opt" data-m="Nagad">Nagad</button>
+      <button type="button" class="am-opt" data-m="Rocket">Rocket</button>
+    </div>
+
+    <div class="am-card" id="amStep2" hidden>
+      <h3>কত টাকা যোগ করবেন?</h3>
+      <p class="am-lim">সর্বনিম্ন ৳১০ — সর্বোচ্চ ৳২০০০০</p>
+      <input id="amAmt" type="number" inputmode="numeric" placeholder="Amount">
+      <button type="button" id="amNext" class="am-btn">ঠিক আছে, এগিয়ে যান</button>
+    </div>
+
+    <div class="am-card" id="amStep3" hidden>
+      <h3 id="amMName"></h3>
+      <p class="am-lim">এই নম্বরে <b>Send Money</b> করুন: <b id="amTk"></b> টাকা</p>
+      <div class="am-num"><span id="amNumber"></span><button type="button" id="amCopy">কপি</button></div>
+      <label>ট্রানজ্যাকশন আইডি</label>
+      <input id="amTrx" type="text" placeholder="ট্রানজ্যাকশন আইডি দিন">
+      <ol class="am-steps">
+        <li>*247# ডায়াল করে বা অ্যাপ খুলুন।</li>
+        <li>Send Money এ ক্লিক করুন।</li>
+        <li>উপরের নম্বরে টাকা পাঠান।</li>
+        <li>পিন দিয়ে নিশ্চিত করুন।</li>
+        <li>ট্রানজ্যাকশন আইডি কপি করে পেস্ট করুন।</li>
+      </ol>
+      <button type="button" id="amVerify" class="am-btn">ভেরিফাই →</button>
+    </div>
+  </div>
+</section>
 <div class="toast" id="toast"></div>
 
 <footer id="siteFooter">
