@@ -682,13 +682,13 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
 .am-pbox{border-radius:18px;overflow:hidden;background:var(--pc,#d1175f);box-shadow:0 14px 28px -14px rgba(0,0,0,.45);transition:background .25s}
 .am-tabs{display:flex;background:#fff}
 .am-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px 9px;border:0;border-bottom:3px solid transparent;background:#fff;color:#334;font-size:13px;font-weight:700;cursor:pointer;transition:.2s}
-.am-tab .lg{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px}
-.am-tab.on{background:var(--pc,#d1175f);color:#fff}
-.am-tab.on .lg{background:#fff;color:var(--pc,#d1175f)}
+.am-tab .lg{width:30px;height:30px;border-radius:9px;overflow:hidden;background:#fff;display:grid;place-items:center}
+.am-tab .lg img,.am-ph .nm i img{width:100%;height:100%;object-fit:cover;display:block}
+.am-tab.on .lg{background:#fff}
 .am-pb{padding:16px}
 .am-ph{display:flex;align-items:center;justify-content:space-between;color:#fff;margin-bottom:14px}
 .am-ph .nm{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
-.am-ph .nm i{width:38px;height:38px;border-radius:11px;background:#fff;color:var(--pc,#d1175f);display:grid;place-items:center;font-style:normal;font-weight:900;font-size:19px}
+.am-ph .nm i{width:38px;height:38px;border-radius:11px;background:#fff;overflow:hidden;display:grid;place-items:center}
 .am-ph .tk{font-weight:800;font-size:19px;text-align:right}
 .am-ph .tk u{display:block;font-size:12px;font-weight:600;cursor:pointer;opacity:.95}
 .am-lbl{color:#fff;font-size:13px;font-weight:700;margin:10px 0 6px;opacity:.95}
@@ -1361,13 +1361,13 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
     <div class="am-pt"><b>ওয়ালেটে টাকা যোগ করুন</b><span>নম্বরে টাকা পাঠিয়ে ট্রানজ্যাকশন আইডি লিখুন</span></div>
     <div class="am-pbox" id="amBox">
       <div class="am-tabs" id="amTabs">
-        <button class="am-tab" type="button" data-m="bKash"><span class="lg">b</span>bKash</button>
-        <button class="am-tab" type="button" data-m="Nagad"><span class="lg">N</span>Nagad</button>
-        <button class="am-tab" type="button" data-m="Rocket"><span class="lg">R</span>Rocket</button>
+        <button class="am-tab" type="button" data-m="bKash"><span class="lg"><img src="bkash.png" alt=""></span>bKash</button>
+        <button class="am-tab" type="button" data-m="Nagad"><span class="lg"><img src="nagad.png" alt=""></span>Nagad</button>
+        <button class="am-tab" type="button" data-m="Rocket"><span class="lg"><img src="rocket.png" alt=""></span>Rocket</button>
       </div>
       <div class="am-pb">
         <div class="am-ph">
-          <div class="nm"><i id="amLg">b</i><span id="amMName">bKash</span></div>
+          <div class="nm"><i id="amLg"><img src="bkash.png" alt=""></i><span id="amMName">bKash</span></div>
           <div class="tk">৳<span id="amTk">0</span>.00<u id="amChange">পরিবর্তন</u></div>
         </div>
         <div class="am-lbl">এই নম্বরে টাকা পাঠান</div>
@@ -2946,7 +2946,7 @@ onAuthStateChanged(auth, async u => {
   // ==========================================
 
   var COLORS = { 'bKash':'#d1175f', 'Nagad':'#e8312a', 'Rocket':'#8b2a8e' };
-  var LOGO   = { 'bKash':'b', 'Nagad':'N', 'Rocket':'R' };
+  var LOGO   = { 'bKash':'bkash.png', 'Nagad':'nagad.png', 'Rocket':'rocket.png' };
   var STEPS = {
     'bKash':  ['*247# ডায়াল করে আপনার bKash মোবাইল মেনুতে যান অথবা bKash অ্যাপ খুলুন।','Send Money -এ ক্লিক করুন।','উপরের নম্বরে টাকা পাঠান।','টাকার পরিমাণ: {amt}','নিশ্চিত করে এখন আপনার bKash PIN লিখুন।','টাকা পাঠান এবং ট্রানজ্যাকশন আইডি কপি করুন।','ট্রানজ্যাকশন আইডি লিখে ভেরিফাই চাপুন।'],
     'Nagad':  ['*167# ডায়াল করে আপনার Nagad মোবাইল মেনুতে যান অথবা Nagad অ্যাপ খুলুন।','Send Money -এ ক্লিক করুন।','উপরের নম্বরে টাকা পাঠান।','টাকার পরিমাণ: {amt}','নিশ্চিত করে এখন আপনার Nagad PIN লিখুন।','টাকা পাঠান এবং ট্রানজ্যাকশন আইডি কপি করুন।','ট্রানজ্যাকশন আইডি লিখে ভেরিফাই চাপুন।'],
@@ -2982,7 +2982,7 @@ onAuthStateChanged(auth, async u => {
     box.style.setProperty('--pc', COLORS[m]);
     document.querySelectorAll('.am-tab').forEach(function(t){ t.classList.toggle('on', t.dataset.m===m); });
     $('amMName').textContent = m;
-    $('amLg').textContent = LOGO[m];
+    $('amLg').innerHTML = '<img src="' + LOGO[m] + '" alt="">';
     $('amTk').textContent = amount.toFixed(2).replace(/\.00$/,'');
     $('amNumber').textContent = NUMBERS[m];
     var ol=$('amSteps'); ol.innerHTML='';
