@@ -3220,7 +3220,7 @@ window.ffPlaceOrder = async function(o){
       const snap = await tx.get(userRef);
       const bal = snap.exists() ? (Number(snap.data().balance) || 0) : 0;
       if (bal < price) throw { code: 'low-balance', need: price, have: bal };
-      tx.update(userRef, { balance: bal - price });
+      tx.update(userRef, { balance: bal - price, lastOrderId: orderRef.id });
       tx.set(orderRef, {
         userId: u.uid, userEmail: u.email || '', userPhone: '',
         category: o.category || '', productId: prod.id, productName: o.name, price: price,
