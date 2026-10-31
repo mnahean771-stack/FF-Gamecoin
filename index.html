@@ -16,7 +16,11 @@
 <style>
 /* অ্যাডমিন ডেটা আসার আগে পুরনো ব্যানার/পপ-আপ ছবি লুকানো থাকে */
 html.ff-wait #track .slide img,html.ff-wait #pop .pimg img{opacity:0}
+html.ff-wait-cat #gridFF>a.card,html.ff-wait-cat .pk-grid>.pk{visibility:hidden}
+html.ff-wait-cat #gridFF{min-height:190px;border-radius:16px;background:linear-gradient(100deg,#eef2fb 30%,#f8faff 50%,#eef2fb 70%);background-size:200% 100%;animation:ffSk 1.1s linear infinite}
+@keyframes ffSk{from{background-position:200% 0}to{background-position:-200% 0}}
 #track .slide img,#pop .pimg img{transition:opacity .35s ease}
+html.ff-wait #track .slide{background:linear-gradient(100deg,#e6ecf8 30%,#f4f7fd 50%,#e6ecf8 70%);background-size:200% 100%;animation:ffSk 1.1s linear infinite}
 </style>
 <script>
 (function(){
@@ -29,6 +33,10 @@ html.ff-wait #track .slide img,html.ff-wait #pop .pimg img{opacity:0}
   };
   // নেটওয়ার্ক ধীর/ব্যর্থ হলে ৩ সেকেন্ড পর ডিফল্ট ছবি দেখানো হবে
   setTimeout(window.ffSiteReady, 3000);
+  var hadCache=false; try{ hadCache=!!localStorage.getItem('ff_cat_cache'); }catch(e){}
+  if(!hadCache) d.classList.add('ff-wait-cat');
+  window.ffCatReady=function(){ d.classList.remove('ff-wait-cat'); };
+  setTimeout(window.ffCatReady, 4000);
 })();
 </script>
 <script>
@@ -3191,19 +3199,34 @@ function reloadOnce() {
 function done() { setFlag(true); location.hash = ''; location.reload(); }
 
 async function saveUser(u, extra) {
-  try {
-    const ref = doc(db, 'users', u.uid);
-    const s = await getDoc(ref);
-    if (!s.exists()) {
-      await setDoc(ref, {
-        name: extra.name || u.displayName || '',
-        phone: extra.phone || '',
-        email: u.email || '',
-        balance: 0,
-        createdAt: serverTimestamp()
-      });
+  extra = extra || {};
+  const ref = doc(db, 'users', u.uid);
+  for (let i = 0; i < 3; i++) {
+    try {
+      let exists = false;
+      try { exists = (await getDoc(ref)).exists(); } catch (e) { exists = false; }
+      if (!exists) {
+        await setDoc(ref, {
+          name: extra.name || u.displayName || (u.email || '').split('@')[0] || '',
+          phone: extra.phone || u.phoneNumber || '',
+          email: u.email || '',
+          balance: 0,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        const patch = {};
+        if (u.email) patch.email = u.email;
+        if (extra.name) patch.name = extra.name;
+        if (extra.phone) patch.phone = extra.phone;
+        if (Object.keys(patch).length) await setDoc(ref, patch, { merge: true });
+      }
+      return true;
+    } catch (e) {
+      console.warn('database (চেষ্টা ' + (i + 1) + '):', e.code || e);
+      await new Promise(r => setTimeout(r, 600));
     }
-  } catch (e) { console.warn('database:', e); }
+  }
+  return false;
 }
 
 /* ---------- গুগল লগইন (লগইন ও রেজিস্টার দুই পেজেই) ---------- */
@@ -3228,7 +3251,7 @@ $('lgBtn').onclick = async () => {
   const em = $('lgEmail').value.trim(), pw = $('lgPass').value;
   if (!em || !pw) return showErr($('lgErr'), 'ইমেইল আর পাসওয়ার্ড দিন');
   showErr($('lgErr'), ''); $('lgBtn').disabled = true;
-  try { await signInWithEmailAndPassword(auth, em, pw); done(); }
+  try { const r = await signInWithEmailAndPassword(auth, em, pw); await saveUser(r.user, {}); done(); }
   catch (e) { showErr($('lgErr'), errMsg(e)); $('lgBtn').disabled = false; }
 };
 
@@ -3276,7 +3299,11 @@ onAuthStateChanged(auth, async u => {
   try { sessionStorage.removeItem('ff_rl'); } catch (e) {}
   if (!u) return;
   let bal = 0;
-  try { const s = await getDoc(doc(db, 'users', u.uid)); if (s.exists()) bal = s.data().balance || 0; } catch (e) {}
+  try {
+    const s = await getDoc(doc(db, 'users', u.uid));
+    if (s.exists()) bal = s.data().balance || 0;
+    else await saveUser(u, {});
+  } catch (e) { saveUser(u, {}); }
   const name = u.displayName || (u.email || '').split('@')[0];
   if (window.ffPushProfile) window.ffPushProfile();
   else if (window.setProfile) window.setProfile({ loggedIn: true, name, email: u.email || '', verified: true, balance: bal, orders: 0, avatar: u.photoURL || '', uid: u.uid });
@@ -3417,7 +3444,7 @@ onAuthStateChanged(auth, async u => {
 <script type="module">
 /* অ্যাডমিন প্যানেল থেকে প্রোডাক্ট ও ক্যাটাগরি এনে সাইটে বসায়। ডেটা না এলে আগের তালিকাই থাকে। */
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 const cfg = {
   apiKey: "AIzaSyAVfTb4qyBe6JDWgjEQvU08zgyEo8bzBzI",
@@ -3444,56 +3471,66 @@ function keepSingleSelection(grid){
   grid.addEventListener("click", e => { if (e.target.closest && e.target.closest(".pk")) clear(); }, true);
 }
 
-async function load(){
+function paint(cats, prods, groups){
+  if (!Object.keys(cats).length && !prods.length) return;
+  if (Object.keys(GRIDS).some(c => cats[c])) {
+    Object.keys(GRIDS).forEach(cid => {
+      if (cats[cid]) return;
+      const k = document.querySelector('a.card[data-open="' + CARDS[cid] + '"]');
+      if (k) k.style.display = "none";
+    });
+  }
+  Object.keys(GRIDS).forEach(cid => {
+    if (!cats[cid]) return;
+    const grid = document.getElementById(GRIDS[cid]); if (!grid) return;
+    const list = prods.filter(p => p.categoryId === cid).sort((a,b) =>
+      (a.order ?? 9999) - (b.order ?? 9999) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    grid.innerHTML = "";
+    list.forEach(p => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "pk";
+      b.dataset.name = p.name || ""; b.dataset.price = Number(p.price) || 0;
+      const s = document.createElement("span"); s.textContent = shown(p);
+      const m = document.createElement("b"); m.textContent = "BDT " + (Number(p.price) || 0);
+      b.append(s, m); grid.appendChild(b);
+    });
+    if (!grid.__single) { grid.__single = true; keepSingleSelection(grid); }
+    const card = document.querySelector('a.card[data-open="' + CARDS[cid] + '"]');
+    if (card){
+      const t = card.querySelector("p");
+      if (t && cats[cid].name && t.textContent.trim().toLowerCase() !== String(cats[cid].name).trim().toLowerCase()) t.textContent = cats[cid].name;
+      const im = card.querySelector("img"), u = cats[cid].image || "";
+      if (im && u) { const nu = /^(data:|https?:)/.test(u) ? u : encodeURI(u); if (im.getAttribute("src") !== nu) im.src = nu; }
+      window.ffSetBadge(card, cats[cid].badge, cats[cid].badgeColor);
+    }
+  });
+  renderCatalog(cats, prods, groups);
+  if (window.ffCatReady) window.ffCatReady();
+}
+function saveCache(cats, prods, groups){ try { localStorage.setItem("ff_cat_cache", JSON.stringify({cats, prods, groups})); } catch(e){} }
+function readCache(){ try { const r = localStorage.getItem("ff_cat_cache"); return r ? JSON.parse(r) : null; } catch(e){ return null; } }
+
+function load(){
+  const c = readCache();
+  if (c && c.cats) { try { paint(c.cats, c.prods || [], c.groups || []); } catch(e){ console.warn(e); } }
   try{
     const app = getApps().length ? getApp() : initializeApp(cfg);
     const db = getFirestore(app);
-    const [cs, ps, gs] = await Promise.all([
-      getDocs(collection(db, "categories")), getDocs(collection(db, "products")),
-      getDocs(collection(db, "groups")).catch(() => null)
-    ]);
-    const cats = {}; cs.forEach(d => cats[d.id] = d.data());
-    const prods = ps.docs.map(d => ({id:d.id, ...d.data()}));
-    const groups = gs ? gs.docs.map(d => ({id:d.id, ...d.data()})) : [];
-    if (!cs.size && !ps.size) return;
-
-    /* অ্যাডমিন থেকে মুছে ফেলা পুরোনো ক্যাটাগরির কার্ড হোম থেকে সরানো (ডেটাবেস অন্তত একবার সিড হয়ে থাকলে) */
-    if (Object.keys(GRIDS).some(c => cats[c])) {
-      Object.keys(GRIDS).forEach(cid => {
-        if (cats[cid]) return;
-        const k = document.querySelector('a.card[data-open="' + CARDS[cid] + '"]');
-        if (k) k.style.display = "none";
-      });
-    }
-
-    Object.keys(GRIDS).forEach(cid => {
-      if (!cats[cid]) return;
-      const grid = document.getElementById(GRIDS[cid]); if (!grid) return;
-      const list = prods.filter(p => p.categoryId === cid).sort((a,b) =>
-        (a.order ?? 9999) - (b.order ?? 9999) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-      grid.innerHTML = "";
-      list.forEach(p => {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "pk";
-        b.dataset.name = p.name || ""; b.dataset.price = Number(p.price) || 0;
-        const s = document.createElement("span"); s.textContent = shown(p);
-        const m = document.createElement("b"); m.textContent = "BDT " + (Number(p.price) || 0);
-        b.append(s, m); grid.appendChild(b);
-      });
-      keepSingleSelection(grid);
-
-      const card = document.querySelector('a.card[data-open="' + CARDS[cid] + '"]');
-      if (card){
-        const t = card.querySelector("p");
-        if (t && cats[cid].name && t.textContent.trim().toLowerCase() !== String(cats[cid].name).trim().toLowerCase()) t.textContent = cats[cid].name;
-        const im = card.querySelector("img"), u = cats[cid].image || "";
-        if (im && u) im.src = /^(data:|https?:)/.test(u) ? u : encodeURI(u);
-        window.ffSetBadge(card, cats[cid].badge, cats[cid].badgeColor);
-      }
-    });
-
-    renderCatalog(cats, prods, groups);
-  }catch(e){ console.warn("প্রোডাক্ট তালিকা আনা যায়নি, আগের তালিকা দেখানো হচ্ছে:", e.code || e.message); }
+    const state = {cats:null, prods:null, groups:[]};
+    let timer = null;
+    const flush = () => {
+      if (state.cats === null || state.prods === null) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try { paint(state.cats, state.prods, state.groups); saveCache(state.cats, state.prods, state.groups); }
+        catch(e){ console.warn(e); }
+      }, 30);
+    };
+    const onErr = e => { console.warn("ডেটা আনা যায়নি:", e.code || e.message); if (window.ffCatReady) window.ffCatReady(); };
+    onSnapshot(collection(db, "categories"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); state.cats = o; flush(); }, onErr);
+    onSnapshot(collection(db, "products"), s => { state.prods = s.docs.map(d => ({id:d.id, ...d.data()})); flush(); }, onErr);
+    onSnapshot(collection(db, "groups"), s => { state.groups = s.docs.map(d => ({id:d.id, ...d.data()})); flush(); }, () => {});
+  }catch(e){ console.warn("প্রোডাক্ট তালিকা আনা যায়নি:", e.code || e.message); if (window.ffCatReady) window.ffCatReady(); }
 }
 
 /* ===== গ্রুপ → ক্যাটাগরি → প্রাইস লিস্ট (অ্যাডমিন প্যানেল থেকে চালানো) ===== */
@@ -3511,6 +3548,8 @@ function renderCatalog(cats, prods, groups){
   window.__ffCat = {cats, prods, groups};
   const secFF = document.getElementById("secFF"), gridFF = document.getElementById("gridFF");
   if (!secFF || !gridFF) return;
+  document.querySelectorAll("[data-dyn-sec]").forEach(n => n.remove());
+  gridFF.querySelectorAll("a.card[data-dyn-card]").forEach(n => n.remove());
   const gl = groups.slice().sort((a,b) => (a.order ?? 9999) - (b.order ?? 9999));
   const gmap = {}; gl.forEach(g => gmap[g.id] = g);
   const legacyGid = (cats.cat_1 && gmap[cats.cat_1.groupId]) ? cats.cat_1.groupId : null;
@@ -3522,10 +3561,10 @@ function renderCatalog(cats, prods, groups){
   let anchor = gridFF;
   gl.forEach(g => {
     if (grids[g.id]) return;
-    const sec = document.createElement("div"); sec.className = "sec";
+    const sec = document.createElement("div"); sec.className = "sec"; sec.dataset.dynSec = "1";
     const h = document.createElement("h2"), em = document.createElement("em");
     em.textContent = g.name || ""; h.appendChild(em); sec.appendChild(h);
-    const gr = document.createElement("div"); gr.className = "grid";
+    const gr = document.createElement("div"); gr.className = "grid"; gr.dataset.dynSec = "1";
     anchor.after(sec); sec.after(gr); anchor = gr; grids[g.id] = gr; secs[g.id] = sec;
   });
 
@@ -3537,7 +3576,7 @@ function renderCatalog(cats, prods, groups){
       if (card) { card.dataset.order = c.order ?? 9999; if (card.parentNode !== target) target.appendChild(card); }
       return;
     }
-    const a = document.createElement("a"); a.className = "card"; a.href = "#cat/" + id; a.dataset.order = c.order ?? 9999;
+    const a = document.createElement("a"); a.className = "card"; a.dataset.dynCard = "1"; a.href = "#cat/" + id; a.dataset.order = c.order ?? 9999;
     const th = document.createElement("div"); th.className = "thumb ph";
     if (c.image) { const im = document.createElement("img"); im.src = imgSrc(c.image); im.alt = c.name || ""; im.loading = "lazy"; th.appendChild(im); }
     const p = document.createElement("p"); p.textContent = c.name || "";
@@ -4087,8 +4126,16 @@ function applyRecent(d){
   });
   sec.hidden = false;
 }
+/* আগের ভিজিটের সেটিংস থাকলে সাথে সাথে বসানো: ব্যানার ও পপ-আপ অপেক্ষা ছাড়াই আসবে */
+try {
+  const raw = localStorage.getItem('ff_site_cache');
+  if (raw) { applySite(JSON.parse(raw)); if (window.ffSiteReady) window.ffSiteReady(); }
+} catch (err) { console.warn('cache:', err); }
 onSnapshot(doc(db, 'settings', 'site'), s => {
-  if (s.exists()) { try { applySite(s.data()); } catch (err) { console.error(err); } }
+  if (s.exists()) {
+    try { applySite(s.data()); } catch (err) { console.error(err); }
+    try { const j = JSON.stringify(s.data()); if (j.length < 3000000) localStorage.setItem('ff_site_cache', j); } catch (err) {}
+  }
   if (window.ffSiteReady) window.ffSiteReady();
 }, e => { console.warn('settings:', e.code); if (window.ffSiteReady) window.ffSiteReady(); });
 </script>

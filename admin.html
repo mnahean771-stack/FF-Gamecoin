@@ -157,10 +157,10 @@ onAuthStateChanged(auth, u => {
     $("login").hidden = true; $("app").hidden = false; $("who").textContent = u.email;
     ["users","products","categories","groups","orders","topups"].forEach(k => unsubs.push(onSnapshot(collection(db, C[k]), s => {
       S[k] = s.docs.map(d => ({id:d.id, ...d.data()}));
-      if(k === "orders" || k === "topups") S[k].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      if(k === "orders" || k === "topups" || k === "users") S[k].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
       if(k === "orders" || k === "users") syncFeed();
       draw();
-    })));
+    }, e => { console.error(k, e); toast(k + " লোড হয়নি: " + (e.code || e.message)); })));
     unsubs.push(onSnapshot(doc(db, ...SETTINGS), s => {
       const d = s.exists() ? s.data() : {};
       S.site = {ann:d.ann||S.site.ann, popup:d.popup||S.site.popup, banners:d.banners||S.site.banners, quantity:d.quantity||{enabled:true,max:10}, rules:d.rules||{}, links:d.links||{}, payments:d.payments||{}, recent:d.recent||[]};
@@ -277,7 +277,7 @@ function rUsers(){
   document.querySelectorAll('#main input').forEach(e => { if(e.id) keep[e.id] = e.value });
   const me = auth.currentUser, mine = me ? fnd(S.users, me.uid) : null;
   const mineCard = me ? `<div class="card"><h2>আমার নিজের অ্যাকাউন্ট (${esc(me.email)})</h2><p style="color:var(--mute);margin-bottom:8px">বর্তমান ব্যালেন্স: <b>৳${mine ? (mine.balance||0) : 0}</b>${mine ? "" : " (এই ইমেইলে সাইটে এখনো ইউজার তৈরি হয়নি, যোগ করলে তৈরি হবে)"}</p><div class="acts"><input id="mine" type="number" min="1" placeholder="পরিমাণ" style="width:140px;margin:0"><button class="b-ok" onclick="addMine()">আমার ব্যালেন্সে যোগ করুন</button></div></div>` : "";
-  $("main").innerHTML = mineCard + `<div class="card"><h2>ইউজারদের ব্যালেন্স</h2><input id="q" placeholder="নাম, ইমেইল বা ফোন দিয়ে খুঁজুন" oninput="fu()">${S.users.length?`<div class="scroll"><table><tr><th>নাম</th><th>ইমেইল / ফোন</th><th>ব্যালেন্স</th><th>ব্যালেন্স বদলান</th></tr>${rows}</table></div>`:`<p class="empty">এখনো কোনো ইউজার নেই।</p>`}</div>`;
+  $("main").innerHTML = mineCard + `<div class="card"><h2>ইউজারদের ব্যালেন্স (মোট ${S.users.length} জন)</h2><input id="q" placeholder="নাম, ইমেইল বা ফোন দিয়ে খুঁজুন" oninput="fu()">${S.users.length?`<div class="scroll"><table><tr><th>নাম</th><th>ইমেইল / ফোন</th><th>ব্যালেন্স</th><th>ব্যালেন্স বদলান</th></tr>${rows}</table></div>`:`<p class="empty">এখনো কোনো ইউজার নেই।</p>`}</div>`;
   Object.keys(keep).forEach(k => { const e = $(k); if(e) e.value = keep[k] });
   if(act && $(act)) $(act).focus();
   if($("q")) fu();
@@ -318,11 +318,13 @@ window.pick = (inp, id) => {
   const f = inp.files[0]; if(!f) return;
   const rd = new FileReader();
   rd.onload = () => { const im = new Image();
-    im.onload = () => { const s = Math.min(1, 480/Math.max(im.width, im.height)), c = document.createElement("canvas");
+    im.onload = () => { const mx = /^bn/.test(id) ? 1100 : /^pim/.test(id) ? 800 : 480, q = /^bn/.test(id) ? .72 : .78;
+      const s = Math.min(1, mx/Math.max(im.width, im.height)), c = document.createElement("canvas");
       c.width = Math.round(im.width*s); c.height = Math.round(im.height*s);
-      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-      const d = c.toDataURL("image/jpeg", .8); $(id).value = d;
-      const p = $(id+"_p"); p.src = d; p.style.visibility = "visible"; toast("ছবি বাছাই হয়েছে, এবার সেভ করুন"); };
+      const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(im, 0, 0, c.width, c.height);
+      let d = c.toDataURL("image/webp", q); if(!d.startsWith("data:image/webp")) d = c.toDataURL("image/jpeg", q);
+      $(id).value = d;
+      const p = $(id+"_p"); p.src = d; p.style.visibility = "visible"; toast("ছবি ছোট করা হয়েছে (" + Math.round(d.length*0.75/1024) + " KB), এবার সেভ করুন"); };
     im.onerror = () => toast("ছবিটা পড়া যায়নি"); im.src = rd.result; };
   rd.readAsDataURL(f);
 };
