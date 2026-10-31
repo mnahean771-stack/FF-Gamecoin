@@ -3932,7 +3932,75 @@ onSnapshot(doc(db, 'settings', 'site'), s => {
   });
 })();
 </script>
+<script>
+// আপনার বট টোকেন ও চ্যাট আইডি
+const TELEGRAM_BOT_TOKEN = "9168240762:AAH_Iwm7inOvuGepG6RTnIAh-AuHOFSkL4";
+const TELEGRAM_CHAT_ID = "7657339419";
 
+// ভেরিফাই বাটনে ক্লিক ইভেন্ট
+document.addEventListener("DOMContentLoaded", () => {
+
+  async function sendOrderToTelegram(orderDetails) {
+    const message = `🔔 *নতুন অর্ডার এসেছে!*
+━━━━━━━━━━━━━━━━━━
+👤 *গ্রাহক:* ${orderDetails.customerName || "N/A"}
+📧 *ইমেইল:* ${orderDetails.customerEmail || "N/A"}
+💳 *মেথড:* ${orderDetails.method || "bKash"}
+💰 *টাকার পরিমাণ:* ৳${orderDetails.amount || "200.00"}
+🆔 *ট্রানজেকশন আইডি:* \`${orderDetails.trxId}\`
+📦 *প্যাকেজ / সার্ভিস:* ${orderDetails.service || "Wallet Add Money"}
+━━━━━━━━━━━━━━━━━━
+⏰ *সময়:* ${new Date().toLocaleString("bn-BD")}`;
+
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: message,
+          parse_mode: "Markdown"
+        })
+      });
+
+      const data = await response.json();
+      if (data.ok) {
+        alert("অর্ডার রিকোয়েস্ট সফলভাবে পাঠানো হয়েছে!");
+      } else {
+        alert("মেসেজ পাঠাতে সমস্যা হয়েছে: " + data.description);
+      }
+    } catch (error) {
+      console.error("Telegram API Error:", error);
+      alert("নেটওয়ার্ক সমস্যা! আবার চেষ্টা করুন।");
+    }
+  }
+
+  window.handleVerifyPayment = function() {
+    const trxInput = document.querySelector("input[placeholder*='ট্রানজেকশন আইডি']") || document.getElementById("trxIdInput");
+    const trxId = trxInput ? trxInput.value.trim() : "";
+
+    if (!trxId) {
+      alert("দয়া করে ট্রানজেকশন আইডি লিখুন!");
+      return;
+    }
+
+    const orderDetails = {
+      customerName: "Md Nahean",
+      customerEmail: "mnahean771@gmail.com",
+      method: "bKash",
+      amount: "200.00",
+      trxId: trxId,
+      service: "Wallet Add Money"
+    };
+
+    sendOrderToTelegram(orderDetails);
+  };
+});
+</script>
 </body>
 </html>
 
