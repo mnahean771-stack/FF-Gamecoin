@@ -117,6 +117,87 @@ async function handleNotify(req, res) {
   }
 }
 
+
+// =======================================================
+// SITE SETTINGS PREFETCH (অ্যাডমিন প্যানেলের ডেটা সার্ভার থেকেই HTML-এর ভেতরে পাঠানো)
+// ফলে ভিজিটর রিফ্রেশ দিলে Firebase-এর অপেক্ষা ছাড়াই রিসেন্ট অর্ডার, হোয়াটসঅ্যাপ,
+// ব্যানার, পপ-আপ, লিঙ্ক সব সাথে সাথে দেখায়। নতুন কিছু অ্যাড করলে ১০ সেকেন্ডের মধ্যে আপডেট হয়।
+// =======================================================
+const FB_PROJECT = process.env.FIREBASE_PROJECT_ID || 'ff-gamecoine';
+const FB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyAVfTb4qyBe6JDWgjEQvU08zgyEo8bzBzI';
+const SETTINGS_TTL = 10000;               // কত মিলিসেকেন্ড পর পর Firestore থেকে নতুন করে আনবে
+let settingsCache = null;                 // সর্বশেষ সফলভাবে আনা সেটিংস (JS object)
+let settingsFetchedAt = 0;
+let settingsInflight = null;
+
+// Firestore REST ফরম্যাট → সাধারণ JS মান
+function fsValue(v) {
+  if (v == null) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('mapValue' in v) { const o = {}; const f = v.mapValue.fields || {}; for (const k in f) o[k] = fsValue(f[k]); return o; }
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsValue);
+  return null;
+}
+
+function fetchSettingsFromFirestore() {
+  return new Promise((resolve, reject) => {
+    const r = https.request({
+      hostname: 'firestore.googleapis.com',
+      path: '/v1/projects/' + FB_PROJECT + '/databases/(default)/documents/settings/site?key=' + FB_API_KEY,
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    }, resp => {
+      let out = '';
+      resp.on('data', c => out += c);
+      resp.on('end', () => {
+        try {
+          if (resp.statusCode !== 200) return reject(new Error('firestore-' + resp.statusCode));
+          const j = JSON.parse(out);
+          const o = {}; const f = j.fields || {};
+          for (const k in f) o[k] = fsValue(f[k]);
+          resolve(o);
+        } catch (e) { reject(e); }
+      });
+    });
+    r.on('error', reject);
+    r.setTimeout(4000, () => r.destroy(new Error('timeout')));
+    r.end();
+  });
+}
+
+// সর্বশেষ সেটিংস দেয়। ক্যাশ পুরোনো হলে পেছনে (background) নতুন করে আনে, ইউজারকে আটকে রাখে না।
+async function getSettings() {
+  const now = Date.now();
+  const stale = !settingsCache || (now - settingsFetchedAt) > SETTINGS_TTL;
+  if (stale && !settingsInflight) {
+    settingsInflight = fetchSettingsFromFirestore()
+      .then(o => { settingsCache = o; settingsFetchedAt = Date.now(); })
+      .catch(e => { console.warn('settings prefetch:', e.message); settingsFetchedAt = Date.now() - SETTINGS_TTL + 3000; })
+      .finally(() => { settingsInflight = null; });
+  }
+  // প্রথমবার ক্যাশ একদম খালি থাকলে সর্বোচ্চ ১.৫ সেকেন্ড অপেক্ষা; তারপর ক্যাশ থাকলে অপেক্ষা ছাড়াই
+  if (!settingsCache && settingsInflight) {
+    await Promise.race([settingsInflight, new Promise(r => setTimeout(r, 1500))]);
+  }
+  return settingsCache;
+}
+getSettings();                                            // সার্ভার চালু হতেই আগে থেকে গরম করে রাখা
+setInterval(() => { getSettings(); }, SETTINGS_TTL);      // নিয়মিত নতুন রাখা
+
+// HTML-এর <head>-এ ডেটা বসানো (</ বা <!-- ভেঙে না যাওয়ার জন্য এস্কেপ করা)
+function injectBoot(html, settings) {
+  if (!settings) return html;
+  const json = JSON.stringify(settings)
+    .replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const tag = '<script>window.__ffBoot=' + json + ';try{localStorage.setItem("ff_site_cache",JSON.stringify(window.__ffBoot))}catch(e){}</script>';
+  return html.replace('<head>', '<head>' + tag);
+}
+
 const server = http.createServer((req, res) => {
   // Telegram নোটিফিকেশন API
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/notify-order') {
@@ -165,7 +246,33 @@ function serveFile(filePath, res) {
 
   res.setHeader('Content-Type', contentType);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+
+  // HTML ও JS/JSON সবসময় সর্বশেষ ভার্সন (পুরোনো কপি যেন ব্রাউজার বা CDN-এ আটকে না থাকে)
+  // ছবি (jpg/png...) ক্যাশ হবে যাতে সাইট দ্রুত লোড হয়
+  const isDynamic = ext === '.html' || ext === '.js' || ext === '.json' || ext === '.css';
+  if (isDynamic) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+  }
+
+  // index.html: অ্যাডমিনের সর্বশেষ সেটিংস HTML-এর ভেতরে বসিয়ে পাঠানো
+  if (ext === '.html' && path.basename(filePath) === 'index.html') {
+    fs.readFile(filePath, 'utf8', async (err, html) => {
+      if (err) {
+        if (!res.headersSent) { res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('500 Internal Server Error'); }
+        return;
+      }
+      let out = html;
+      try { out = injectBoot(html, await getSettings()); } catch (e) { out = html; }
+      res.setHeader('Content-Length', Buffer.byteLength(out));
+      res.writeHead(200);
+      res.end(out);
+    });
+    return;
+  }
 
   const stream = fs.createReadStream(filePath);
   stream.on('error', () => {

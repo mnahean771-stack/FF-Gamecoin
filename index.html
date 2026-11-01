@@ -55,7 +55,7 @@ html.ff-wait #track .slide{background:linear-gradient(100deg,#e6ecf8 30%,#f4f7fd
       if(p.title){ var b = document.createElement('b'); b.textContent = p.title; pt.appendChild(b); pt.appendChild(document.createElement('br')); }
       String(p.message || '').split(/\r?\n/).forEach(function(line, i){ if(i) pt.appendChild(document.createElement('br')); pt.appendChild(document.createTextNode(line)); });
       if(p.image && /^(data:image\/|https?:)/.test(p.image)){ var im = document.querySelector('#pop .pimg img'); if(im) im.src = p.image; }
-      window.__ffPopCached = true;
+      window.__ffPopCached = true; window.__ffAdminPopup = true;
       if(window.ffSiteReady) window.ffSiteReady();
     }catch(e){}
   }
@@ -125,7 +125,7 @@ function syncAccountLinks() {
   var note = (typeof notification_text !== 'undefined' ? notification_text : (window.notification_text || (window.ACCOUNT_CONFIG && window.ACCOUNT_CONFIG.notificationText) || '')).toString();
   note = note.replace(/\\n/g, '\n').trim();
   var popEl = document.getElementById('popText');
-  if (popEl && note) {
+  if (popEl && note && window.__ffAllowAccountPopup === true) {   /* popup text comes only from admin panel, not account.js */
     popEl.textContent = '';
     note.split(/\r?\n/).forEach(function(line, i){
       if (i) popEl.appendChild(document.createElement('br'));
@@ -1884,7 +1884,7 @@ function syncAccountLinks() {
   var note = (typeof notification_text !== 'undefined' ? notification_text : (window.notification_text || '')).toString();
   note = note.replace(/\\n/g, '\n').trim();
   var popEl = document.getElementById('popText');
-  if (popEl && note) {
+  if (popEl && note && window.__ffAllowAccountPopup === true) {   /* popup text comes only from admin panel, not account.js */
     popEl.textContent = '';
     note.split(/\r?\n/).forEach(function(line, i){
       if (i) popEl.appendChild(document.createElement('br'));
@@ -3745,6 +3745,203 @@ load();
 </script>
 
 
+<script>
+/* ===== অ্যাডমিন সেটিংস বসানোর কোড (Firebase ছাড়া, সাথে সাথে চলে) ===== */
+(function(){
+const $ = id => document.getElementById(id);
+/* ---------- নোটিশ বার, পপ-আপ, ব্যানার (অ্যাডমিন প্যানেল থেকে) ---------- */
+function applySite(d){
+  // উপরের নোটিশ বার (NOTICE ট্যাগ + স্লাইড + বন্ধ বাটন, রঙ ও স্পিড অ্যাডমিন থেকে)
+  let bar = $('ffAnn');
+  if (!document.getElementById('ffAnnCss')) {
+    const st = document.createElement('style'); st.id = 'ffAnnCss';
+    st.textContent = '@keyframes ffMarq{from{transform:translateX(0)}to{transform:translateX(-100%)}}'
+      + '#ffAnn{display:flex;align-items:center;gap:10px;margin:10px 12px 0;padding:8px 10px;border-radius:99px;box-shadow:0 8px 20px -10px rgba(0,0,0,.45);position:relative;z-index:30;box-sizing:border-box;overflow:hidden}'
+      + '#ffAnn .ffn-tag{flex:none;display:inline-flex;align-items:center;gap:7px;background:#fff;border-radius:99px;padding:7px 14px;font-weight:800;font-size:13px;letter-spacing:.2px}'
+      + '#ffAnn .ffn-tag i{width:9px;height:9px;border-radius:50%;background:currentColor;display:inline-block}'
+      + '#ffAnn .ffn-win{flex:1;min-width:0;overflow:hidden;white-space:nowrap}'
+      + '#ffAnn .ffm{display:inline-block;padding-left:100%;font-weight:700;font-size:15px;animation:ffMarq linear infinite}'
+      + '#ffAnn .ffn-x{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:rgba(255,255,255,.75);font-weight:800;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}';
+    document.head.appendChild(st);
+  }
+  let annClosed = false; try { annClosed = sessionStorage.getItem('ff_ann_x') === (d.ann && d.ann.text); } catch (e) {}
+  if (d.ann && d.ann.active && d.ann.text && !annClosed) {
+    const A = d.ann, bg = /^#[0-9a-f]{3,8}$/i.test(A.bg || '') ? A.bg : '#e11d48', fg = /^#[0-9a-f]{3,8}$/i.test(A.color || '') ? A.color : '#ffffff';
+    const speed = Math.max(1, Math.min(10, Number(A.speed) || 6));
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'ffAnn';
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+    bar.style.background = bg; bar.style.color = fg;
+    const sig = [A.text, bg, fg, speed].join('|');
+    if (bar.dataset.t !== sig) {
+      bar.dataset.t = sig;
+      bar.textContent = '';
+      const tag = document.createElement('span'); tag.className = 'ffn-tag'; tag.style.color = bg;
+      tag.appendChild(document.createElement('i')); tag.appendChild(document.createTextNode('NOTICE'));
+      const win = document.createElement('div'); win.className = 'ffn-win';
+      const sp = document.createElement('span'); sp.className = 'ffm'; sp.textContent = A.text;
+      win.appendChild(sp);
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'ffn-x'; x.setAttribute('aria-label', 'Close'); x.style.color = bg; x.textContent = '✕';
+      x.onclick = () => { bar.style.display = 'none'; try { sessionStorage.setItem('ff_ann_x', A.text); } catch (e) {} };
+      bar.append(tag, win, x);
+      bar.style.display = '';
+      const pps = speed * 20;                         // পিক্সেল/সেকেন্ড (স্পিড ১-১০)
+      sp.style.animationDuration = Math.max(4, sp.offsetWidth / pps) + 's';
+    }
+    bar.style.display = '';
+  } else if (bar) bar.style.display = 'none';
+
+  // পপ-আপ
+  const p = d.popup;
+  if (p && p.active && (p.message || p.title)) {
+    window.__ffAdminPopup = true;
+    const pt = $('popText');
+    if (pt) { pt.textContent = ''; if (p.title) { const b = document.createElement('b'); b.textContent = p.title; pt.appendChild(b); pt.appendChild(document.createElement('br')); }
+      String(p.message || '').split(/\r?\n/).forEach((line, i) => { if (i) pt.appendChild(document.createElement('br')); pt.appendChild(document.createTextNode(line)); }); }
+    if (p.image && /^(data:image\/|https?:)/.test(p.image)) { const im = document.querySelector('#pop .pimg img'); if (im) im.src = p.image; }
+  }
+  // পপ-আপের ছবিতে ক্লিক করলে লিঙ্কে নিয়ে যাওয়া (অ্যাডমিন থেকে বসানো)
+  {
+    const box = document.querySelector('#pop .pimg');
+    if (box) {
+      const u = lkOk((p && p.link) || '');
+      if (u) {
+        box.style.cursor = 'pointer';
+        box.onclick = () => { window.open(u, '_blank', 'noopener'); };
+      } else { box.style.cursor = ''; box.onclick = null; }
+    }
+  }
+
+  // স্লাইডারের ব্যানার (alt লেখা দেখে মেলানো হয়, তাই ক্লোন স্লাইডেও ঠিক ছবি বসে)
+  if (Array.isArray(d.banners)) {
+    document.querySelectorAll('#track .slide img').forEach(im => {
+      const k = parseInt((im.alt.match(/\d/) || [])[0], 10) - 1;
+      const u = d.banners[k];
+      if (u && /^(data:image\/|https?:)/.test(u)) im.src = u;
+    });
+  }
+
+  window.__ffSite = d;
+  try { applyRules(d); applyQty(d); applyLinks(d); applyRecent(d); } catch (err) { console.error(err); }
+}
+
+/* ---------- Rules & Conditions (প্রতিটা পেজের আলাদা, অ্যাডমিন থেকে) ---------- */
+function applyRules(d){
+  const R = d.rules || {};
+  document.querySelectorAll('[data-rules]').forEach(box => {
+    const k = box.getAttribute('data-rules');
+    if (!(k in R)) { if (!box.querySelector('li')) box.hidden = true; return; }   // অ্যাডমিন কিছু বসায়নি: আগের লেখা থাকবে
+    const e = R[k] || {};
+    const lines = String(e.text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (e.active === false || !lines.length) { box.hidden = true; return; }
+    const ul = box.querySelector('ul'); ul.textContent = '';
+    lines.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+    box.hidden = false;
+  });
+  // অ্যাডমিন থেকে বানানো ক্যাটাগরির পেজ: ক্যাটাগরির নিজের নিয়ম না থাকলে "সব পেজের ডিফল্ট" নিয়ম
+  window.__ffDefaultRules = (R.default && R.default.active !== false)
+    ? String(R.default.text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean) : [];
+  if (window.ffRefreshDynRules) window.ffRefreshDynRules();
+}
+
+/* ---------- Quantity ---------- */
+function applyQty(d){
+  const q = d.quantity || {};
+  const on = q.enabled !== false;
+  const max = Math.max(1, Math.floor(Number(q.max) || 10));
+  document.querySelectorAll('[data-qty]').forEach(row => {
+    row.hidden = !on;
+    const out = row.querySelector('[data-qv]'), m = row.querySelector('[data-qm]'), p = row.querySelector('[data-qp]');
+    if (!row.__bound) {
+      row.__bound = true; row.__v = 1;
+      const set = n => { row.__v = Math.max(1, Math.min(window.__ffQMax || 10, n)); out.textContent = row.__v; sync(); };
+      const sync = () => { m.disabled = row.__v <= 1; p.disabled = row.__v >= (window.__ffQMax || 10); document.dispatchEvent(new CustomEvent('ff-qty')); };
+      m.addEventListener('click', () => set(row.__v - 1));
+      p.addEventListener('click', () => set(row.__v + 1));
+      row.__set = set;
+    }
+  });
+  window.__ffQMax = max; window.__ffQOn = on;
+  document.querySelectorAll('[data-qty]').forEach(r => r.__set && r.__set(r.__v || 1));
+}
+window.ffQty = function(){
+  if (!window.__ffQOn) return 1;
+  const rows = Array.from(document.querySelectorAll('[data-qty]')).filter(r => r.offsetParent !== null);
+  return rows.length ? (rows[0].__v || 1) : 1;
+};
+
+/* ---------- Contact Us / Help বাটনের লিঙ্ক (অ্যাডমিন প্যানেল থেকে) ---------- */
+const lkOk = (u, wa) => {
+  u = String(u || '').trim(); if (!u) return '';
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(u)) return u;
+  if (wa && /^\+?[\d\s-]{7,}$/.test(u)) return 'https://wa.me/' + u.replace(/\D/g, '');
+  if (/^(wa\.me|t\.me|chat\.whatsapp\.com|[\w-]+(\.[\w-]+)+)(\/|$)/i.test(u)) return 'https://' + u;
+  return '';
+};
+const setHref = (el, url) => { el.href = url; el.target = '_blank'; el.rel = 'noopener noreferrer'; el.onclick = null; };
+function paintLinks(){
+  const L = window.__ffLinks || {};
+  const ct = lkOk(L.contactTelegram), cw = lkOk(L.contactWhatsapp, true),
+        ht = lkOk(L.helpTelegram), hg = lkOk(L.helpGroup), hy = lkOk(L.helpYoutube);
+  document.querySelectorAll('[data-link="telegram-channel"]').forEach(a => {
+    const u = a.hasAttribute('data-help') ? (ht || ct) : ct; if (u) setHref(a, u); });
+  document.querySelectorAll('[data-link="telegram-group"]').forEach(a => { if (hg) setHref(a, hg); });
+  document.querySelectorAll('[data-link="youtube-channel"]').forEach(a => { if (hy) setHref(a, hy); });
+  const qs = lkOk(L.quickSupport), qg = lkOk(L.quickGroup);
+  document.querySelectorAll('[data-quick="support"]').forEach(a => { if (qs) setHref(a, qs); });
+  document.querySelectorAll('[data-quick="group"]').forEach(a => { if (qg) setHref(a, qg); });
+  document.querySelectorAll('[data-contact="whatsapp"]').forEach(a => { if (cw) { setHref(a, cw); a.hidden = false; } else a.hidden = true; });
+}
+function applyLinks(d){ window.__ffLinks = d.links || {}; paintLinks(); }
+(function(){
+  const orig = window.syncAccountLinks;      // account.js লিঙ্ক বসানোর পরে অ্যাডমিনের লিঙ্ক আবার বসবে
+  window.syncAccountLinks = function(){ if (orig) orig.apply(this, arguments); paintLinks(); };
+})();
+
+/* ---------- Recent Orders (লাইভ) ---------- */
+const RC_ST = {
+  completed:['Done','ok','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>'],
+  processing:['Processing','pr','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
+  pending:['Pending','pe','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
+  cancelled:['Cancelled','cx','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>']
+};
+const RC_COL = ['#2e7d32','#d84315','#6a1b9a','#00838f','#c2185b','#1565c0','#ef6c00','#455a64','#558b2f','#ad1457'];
+function applyRecent(d){
+  const sec = $('recentSec'), list = $('recentList'); if (!sec || !list) return;
+  const arr = Array.isArray(d.recent) ? d.recent.slice(0, 10) : [];
+  list.textContent = '';
+  if (!arr.length) { sec.hidden = true; return; }
+  arr.forEach((r, i) => {
+    const name = String(r.name || 'User').trim() || 'User';
+    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const st = RC_ST[r.status] || RC_ST.pending;
+    const row = document.createElement('div'); row.className = 'rc-row'; row.style.animationDelay = (i * 40) + 'ms';
+    const av = document.createElement('span'); av.className = 'rc-av'; av.style.background = RC_COL[h % RC_COL.length];
+    av.textContent = name.charAt(0).toUpperCase();
+    const tx = document.createElement('span'); tx.className = 'rc-tx';
+    const b = document.createElement('b'); b.textContent = name;
+    const it = document.createElement('span'); it.textContent = String(r.item || '');
+    tx.append(b, it);
+    const chip = document.createElement('span'); chip.className = 'rc-st ' + st[1]; chip.innerHTML = st[2];
+    chip.appendChild(document.createTextNode(st[0]));
+    row.append(av, tx, chip); list.appendChild(row);
+  });
+  sec.hidden = false;
+}
+/* আগের ভিজিটের সেটিংস থাকলে সাথে সাথে বসানো: ব্যানার ও পপ-আপ অপেক্ষা ছাড়াই আসবে */
+
+window.ffApplySite = applySite;
+function boot(){
+  try {
+    var c = window.__ffBoot;
+    if (!c || typeof c !== 'object') { var raw = localStorage.getItem('ff_site_cache'); if (raw) c = JSON.parse(raw); }
+    if (c) { applySite(c); if (window.ffSiteReady) window.ffSiteReady(); }
+  } catch (err) { console.warn('boot:', err); }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 <script type="module">
 /* =====================================================================
    FF GAMECOIN — অর্ডার, ব্যালেন্স, টাকা যোগ, নোটিশ/পপ-আপ/ব্যানার
@@ -4051,191 +4248,8 @@ function bindAddMoney(){
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindAddMoney); else bindAddMoney();
 
-/* ---------- নোটিশ বার, পপ-আপ, ব্যানার (অ্যাডমিন প্যানেল থেকে) ---------- */
-function applySite(d){
-  // উপরের নোটিশ বার (NOTICE ট্যাগ + স্লাইড + বন্ধ বাটন, রঙ ও স্পিড অ্যাডমিন থেকে)
-  let bar = $('ffAnn');
-  if (!document.getElementById('ffAnnCss')) {
-    const st = document.createElement('style'); st.id = 'ffAnnCss';
-    st.textContent = '@keyframes ffMarq{from{transform:translateX(0)}to{transform:translateX(-100%)}}'
-      + '#ffAnn{display:flex;align-items:center;gap:10px;margin:10px 12px 0;padding:8px 10px;border-radius:99px;box-shadow:0 8px 20px -10px rgba(0,0,0,.45);position:relative;z-index:30;box-sizing:border-box;overflow:hidden}'
-      + '#ffAnn .ffn-tag{flex:none;display:inline-flex;align-items:center;gap:7px;background:#fff;border-radius:99px;padding:7px 14px;font-weight:800;font-size:13px;letter-spacing:.2px}'
-      + '#ffAnn .ffn-tag i{width:9px;height:9px;border-radius:50%;background:currentColor;display:inline-block}'
-      + '#ffAnn .ffn-win{flex:1;min-width:0;overflow:hidden;white-space:nowrap}'
-      + '#ffAnn .ffm{display:inline-block;padding-left:100%;font-weight:700;font-size:15px;animation:ffMarq linear infinite}'
-      + '#ffAnn .ffn-x{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:rgba(255,255,255,.75);font-weight:800;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}';
-    document.head.appendChild(st);
-  }
-  let annClosed = false; try { annClosed = sessionStorage.getItem('ff_ann_x') === (d.ann && d.ann.text); } catch (e) {}
-  if (d.ann && d.ann.active && d.ann.text && !annClosed) {
-    const A = d.ann, bg = /^#[0-9a-f]{3,8}$/i.test(A.bg || '') ? A.bg : '#e11d48', fg = /^#[0-9a-f]{3,8}$/i.test(A.color || '') ? A.color : '#ffffff';
-    const speed = Math.max(1, Math.min(10, Number(A.speed) || 6));
-    if (!bar) {
-      bar = document.createElement('div'); bar.id = 'ffAnn';
-      document.body.insertBefore(bar, document.body.firstChild);
-    }
-    bar.style.background = bg; bar.style.color = fg;
-    const sig = [A.text, bg, fg, speed].join('|');
-    if (bar.dataset.t !== sig) {
-      bar.dataset.t = sig;
-      bar.textContent = '';
-      const tag = document.createElement('span'); tag.className = 'ffn-tag'; tag.style.color = bg;
-      tag.appendChild(document.createElement('i')); tag.appendChild(document.createTextNode('NOTICE'));
-      const win = document.createElement('div'); win.className = 'ffn-win';
-      const sp = document.createElement('span'); sp.className = 'ffm'; sp.textContent = A.text;
-      win.appendChild(sp);
-      const x = document.createElement('button'); x.type = 'button'; x.className = 'ffn-x'; x.setAttribute('aria-label', 'Close'); x.style.color = bg; x.textContent = '✕';
-      x.onclick = () => { bar.style.display = 'none'; try { sessionStorage.setItem('ff_ann_x', A.text); } catch (e) {} };
-      bar.append(tag, win, x);
-      bar.style.display = '';
-      const pps = speed * 20;                         // পিক্সেল/সেকেন্ড (স্পিড ১-১০)
-      sp.style.animationDuration = Math.max(4, sp.offsetWidth / pps) + 's';
-    }
-    bar.style.display = '';
-  } else if (bar) bar.style.display = 'none';
-
-  // পপ-আপ
-  const p = d.popup;
-  if (p && p.active && (p.message || p.title)) {
-    const pt = $('popText');
-    if (pt) { pt.textContent = ''; if (p.title) { const b = document.createElement('b'); b.textContent = p.title; pt.appendChild(b); pt.appendChild(document.createElement('br')); }
-      String(p.message || '').split(/\r?\n/).forEach((line, i) => { if (i) pt.appendChild(document.createElement('br')); pt.appendChild(document.createTextNode(line)); }); }
-    if (p.image && /^(data:image\/|https?:)/.test(p.image)) { const im = document.querySelector('#pop .pimg img'); if (im) im.src = p.image; }
-  }
-  // পপ-আপের ছবিতে ক্লিক করলে লিঙ্কে নিয়ে যাওয়া (অ্যাডমিন থেকে বসানো)
-  {
-    const box = document.querySelector('#pop .pimg');
-    if (box) {
-      const u = lkOk((p && p.link) || '');
-      if (u) {
-        box.style.cursor = 'pointer';
-        box.onclick = () => { window.open(u, '_blank', 'noopener'); };
-      } else { box.style.cursor = ''; box.onclick = null; }
-    }
-  }
-
-  // স্লাইডারের ব্যানার (alt লেখা দেখে মেলানো হয়, তাই ক্লোন স্লাইডেও ঠিক ছবি বসে)
-  if (Array.isArray(d.banners)) {
-    document.querySelectorAll('#track .slide img').forEach(im => {
-      const k = parseInt((im.alt.match(/\d/) || [])[0], 10) - 1;
-      const u = d.banners[k];
-      if (u && /^(data:image\/|https?:)/.test(u)) im.src = u;
-    });
-  }
-
-  window.__ffSite = d;
-  try { applyRules(d); applyQty(d); applyLinks(d); applyRecent(d); } catch (err) { console.error(err); }
-}
-
-/* ---------- Rules & Conditions (প্রতিটা পেজের আলাদা, অ্যাডমিন থেকে) ---------- */
-function applyRules(d){
-  const R = d.rules || {};
-  document.querySelectorAll('[data-rules]').forEach(box => {
-    const k = box.getAttribute('data-rules');
-    if (!(k in R)) { if (!box.querySelector('li')) box.hidden = true; return; }   // অ্যাডমিন কিছু বসায়নি: আগের লেখা থাকবে
-    const e = R[k] || {};
-    const lines = String(e.text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-    if (e.active === false || !lines.length) { box.hidden = true; return; }
-    const ul = box.querySelector('ul'); ul.textContent = '';
-    lines.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
-    box.hidden = false;
-  });
-  // অ্যাডমিন থেকে বানানো ক্যাটাগরির পেজ: ক্যাটাগরির নিজের নিয়ম না থাকলে "সব পেজের ডিফল্ট" নিয়ম
-  window.__ffDefaultRules = (R.default && R.default.active !== false)
-    ? String(R.default.text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean) : [];
-  if (window.ffRefreshDynRules) window.ffRefreshDynRules();
-}
-
-/* ---------- Quantity ---------- */
-function applyQty(d){
-  const q = d.quantity || {};
-  const on = q.enabled !== false;
-  const max = Math.max(1, Math.floor(Number(q.max) || 10));
-  document.querySelectorAll('[data-qty]').forEach(row => {
-    row.hidden = !on;
-    const out = row.querySelector('[data-qv]'), m = row.querySelector('[data-qm]'), p = row.querySelector('[data-qp]');
-    if (!row.__bound) {
-      row.__bound = true; row.__v = 1;
-      const set = n => { row.__v = Math.max(1, Math.min(window.__ffQMax || 10, n)); out.textContent = row.__v; sync(); };
-      const sync = () => { m.disabled = row.__v <= 1; p.disabled = row.__v >= (window.__ffQMax || 10); document.dispatchEvent(new CustomEvent('ff-qty')); };
-      m.addEventListener('click', () => set(row.__v - 1));
-      p.addEventListener('click', () => set(row.__v + 1));
-      row.__set = set;
-    }
-  });
-  window.__ffQMax = max; window.__ffQOn = on;
-  document.querySelectorAll('[data-qty]').forEach(r => r.__set && r.__set(r.__v || 1));
-}
-window.ffQty = function(){
-  if (!window.__ffQOn) return 1;
-  const rows = Array.from(document.querySelectorAll('[data-qty]')).filter(r => r.offsetParent !== null);
-  return rows.length ? (rows[0].__v || 1) : 1;
-};
-
-/* ---------- Contact Us / Help বাটনের লিঙ্ক (অ্যাডমিন প্যানেল থেকে) ---------- */
-const lkOk = (u, wa) => {
-  u = String(u || '').trim(); if (!u) return '';
-  if (/^(https?:\/\/|mailto:|tel:)/i.test(u)) return u;
-  if (wa && /^\+?[\d\s-]{7,}$/.test(u)) return 'https://wa.me/' + u.replace(/\D/g, '');
-  if (/^(wa\.me|t\.me|chat\.whatsapp\.com|[\w-]+(\.[\w-]+)+)(\/|$)/i.test(u)) return 'https://' + u;
-  return '';
-};
-const setHref = (el, url) => { el.href = url; el.target = '_blank'; el.rel = 'noopener noreferrer'; el.onclick = null; };
-function paintLinks(){
-  const L = window.__ffLinks || {};
-  const ct = lkOk(L.contactTelegram), cw = lkOk(L.contactWhatsapp, true),
-        ht = lkOk(L.helpTelegram), hg = lkOk(L.helpGroup), hy = lkOk(L.helpYoutube);
-  document.querySelectorAll('[data-link="telegram-channel"]').forEach(a => {
-    const u = a.hasAttribute('data-help') ? (ht || ct) : ct; if (u) setHref(a, u); });
-  document.querySelectorAll('[data-link="telegram-group"]').forEach(a => { if (hg) setHref(a, hg); });
-  document.querySelectorAll('[data-link="youtube-channel"]').forEach(a => { if (hy) setHref(a, hy); });
-  const qs = lkOk(L.quickSupport), qg = lkOk(L.quickGroup);
-  document.querySelectorAll('[data-quick="support"]').forEach(a => { if (qs) setHref(a, qs); });
-  document.querySelectorAll('[data-quick="group"]').forEach(a => { if (qg) setHref(a, qg); });
-  document.querySelectorAll('[data-contact="whatsapp"]').forEach(a => { if (cw) { setHref(a, cw); a.hidden = false; } else a.hidden = true; });
-}
-function applyLinks(d){ window.__ffLinks = d.links || {}; paintLinks(); }
-(function(){
-  const orig = window.syncAccountLinks;      // account.js লিঙ্ক বসানোর পরে অ্যাডমিনের লিঙ্ক আবার বসবে
-  window.syncAccountLinks = function(){ if (orig) orig.apply(this, arguments); paintLinks(); };
-})();
-
-/* ---------- Recent Orders (লাইভ) ---------- */
-const RC_ST = {
-  completed:['Done','ok','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>'],
-  processing:['Processing','pr','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
-  pending:['Pending','pe','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
-  cancelled:['Cancelled','cx','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>']
-};
-const RC_COL = ['#2e7d32','#d84315','#6a1b9a','#00838f','#c2185b','#1565c0','#ef6c00','#455a64','#558b2f','#ad1457'];
-function applyRecent(d){
-  const sec = $('recentSec'), list = $('recentList'); if (!sec || !list) return;
-  const arr = Array.isArray(d.recent) ? d.recent.slice(0, 10) : [];
-  list.textContent = '';
-  if (!arr.length) { sec.hidden = true; return; }
-  arr.forEach((r, i) => {
-    const name = String(r.name || 'User').trim() || 'User';
-    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    const st = RC_ST[r.status] || RC_ST.pending;
-    const row = document.createElement('div'); row.className = 'rc-row'; row.style.animationDelay = (i * 40) + 'ms';
-    const av = document.createElement('span'); av.className = 'rc-av'; av.style.background = RC_COL[h % RC_COL.length];
-    av.textContent = name.charAt(0).toUpperCase();
-    const tx = document.createElement('span'); tx.className = 'rc-tx';
-    const b = document.createElement('b'); b.textContent = name;
-    const it = document.createElement('span'); it.textContent = String(r.item || '');
-    tx.append(b, it);
-    const chip = document.createElement('span'); chip.className = 'rc-st ' + st[1]; chip.innerHTML = st[2];
-    chip.appendChild(document.createTextNode(st[0]));
-    row.append(av, tx, chip); list.appendChild(row);
-  });
-  sec.hidden = false;
-}
-/* আগের ভিজিটের সেটিংস থাকলে সাথে সাথে বসানো: ব্যানার ও পপ-আপ অপেক্ষা ছাড়াই আসবে */
-try {
-  const raw = localStorage.getItem('ff_site_cache');
-  if (raw) { const c = JSON.parse(raw); applySite({ banners: c.banners, popup: c.popup });   /* আগের ভিজিটের পপ-আপ সাথে সাথে বসে, তারপর লাইভ ডেটা এলে নিজে আপডেট হয় */
-  if (c && c.popup && (c.popup.message || c.popup.title)) { if (window.ffSiteReady) window.ffSiteReady(); } }
-} catch (err) { console.warn('cache:', err); }
+/* ডেটা বসানোর কোড এখন আলাদা সাধারণ স্ক্রিপ্টে (window.ffApplySite), যাতে Firebase-এর অপেক্ষা না করে চলে */
+const applySite = d => window.ffApplySite && window.ffApplySite(d);
 onSnapshot(doc(db, 'settings', 'site'), s => {
   if (s.exists()) {
     try { applySite(s.data()); } catch (err) { console.error(err); }
