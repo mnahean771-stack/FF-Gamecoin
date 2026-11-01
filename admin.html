@@ -227,7 +227,7 @@ function rOrders(){
     .map(x => `<button class="${ofil===x[0]?"on":""}" onclick="setOf('${x[0]}')">${x[1]}</button>`).join("");
   const rows = list.map(o => {
     const closed = o.status === "completed" || o.status === "cancelled";
-    return `<tr><td>${esc(who(o))}</td><td>${esc(o.productName)}</td><td>৳${o.price}</td><td>${esc(o.playerId)}</td><td><span class="tag ${o.status}">${stl[o.status]||o.status}</span></td><td><div class="acts">${closed?"":`<button class="b-gr sm" onclick="setO('${o.id}','processing')">প্রসেসিং</button><button class="b-ok sm" onclick="setO('${o.id}','completed')">সম্পন্ন</button><button class="b-bad sm" onclick="cancelO('${o.id}')">বাতিল</button>`}</div></td></tr>`;
+    return `<tr><td>${esc(who(o))}</td><td>${esc(o.productName)}</td><td>৳${o.price}</td><td>${esc(o.playerId)}${(o.extra||[]).map(x => `<div style="font-size:12px;color:var(--mute)">${esc(x.label)}: <b>${esc(x.value)}</b></div>`).join("")}</td><td><span class="tag ${o.status}">${stl[o.status]||o.status}</span></td><td><div class="acts">${closed?"":`<button class="b-gr sm" onclick="setO('${o.id}','processing')">প্রসেসিং</button><button class="b-ok sm" onclick="setO('${o.id}','completed')">সম্পন্ন</button><button class="b-bad sm" onclick="cancelO('${o.id}')">বাতিল</button>`}</div></td></tr>`;
   }).join("");
   $("main").innerHTML = `<div class="card"><div class="filters">${f}</div>${list.length?`<div class="scroll"><table><tr><th>ইমেইল / ফোন</th><th>প্রোডাক্ট</th><th>দাম</th><th>Player ID</th><th>স্ট্যাটাস</th><th>অ্যাকশন</th></tr>${rows}</table></div>`:`<p class="empty">এই ফিল্টারে কোনো অর্ডার নেই।</p>`}</div>`;
 }
@@ -407,21 +407,36 @@ window.migG = () => openEdit("ক্যাটাগরির নাম দিন
   await b.commit();
 }, "ক্যাটাগরি তৈরি হয়েছে, প্রোডাক্টগুলো ঢুকেছে"), "তৈরি করুন");
 
+/* ফর্মের ফিল্ড: প্রতি লাইনে একটা => লেবেল | টাইপ | ঐচ্ছিক  (টাইপ: text, number, email, password) */
+const FTYPES = ["text","number","email","password"];
+function parseFields(t){
+  return String(t||"").split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0,12).map(l => {
+    const p = l.split("|").map(x => x.trim());
+    const type = FTYPES.includes((p[1]||"").toLowerCase()) ? p[1].toLowerCase() : "text";
+    const opt = /^(ঐচ্ছিক|optional|opt|\?)$/i.test(p[2]||"");
+    return {label:p[0], type:type, required:!opt};
+  }).filter(f => f.label);
+}
+function fieldsToText(a){
+  return (Array.isArray(a)?a:[]).map(f => f.label+" | "+(f.type||"text")+(f.required===false?" | ঐচ্ছিক":"")).join("\n");
+}
+const FIELDS_HINT = "ফর্মের ঘরগুলো (প্রতি লাইনে একটা ঘর)। লেখার নিয়ম: নাম | টাইপ | ঐচ্ছিক। টাইপ: text / number / email / password। ঐচ্ছিক লিখলে ঘরটা না ভরলেও চলবে। ফাঁকা রাখলে শুধু একটা আইডির ঘর থাকবে।";
+
 /* স্তর ২: গ্রুপের ভেতরের ক্যাটাগরি (যেমন: FF Auto Like, UID Topup) */
 function lvCats(){
   const list = (cg === "_none" ? S.categories.filter(noGroup) : S.categories.filter(c => c.groupId === cg)).sort(byOrder);
   const rows = list.map(c => `<tr><td>${img(c.image)}</td><td>${esc(c.name)}</td><td>${badgeTag(c)}</td><td>${S.products.filter(p=>p.categoryId===c.id).length}টি প্যাকেজ</td><td><div class="acts"><button class="sm" onclick="cgo('${cg}','${c.id}')">প্রাইস লিস্ট</button><button class="b-gr sm" onclick="eC2('${c.id}')">এডিট</button><button class="b-bad sm" onclick="del('categories','${c.id}')">ডিলিট</button></div></td></tr>`).join("");
-  const form = cg === "_none" ? "" : `<div class="card"><h2>নতুন প্রোডাক্ট</h2><div class="grid"><input id="cn" placeholder="প্রোডাক্টের নাম (যেমন FF Auto Like)"><input id="cl" placeholder="আইডির লেবেল (যেমন Player ID)"></div><label style="font-size:13px;color:var(--mute)">কার্ডের উপরের ব্যাজ (যেমন: ডায়মন্ড টপআপ, উইকলি, মান্থলি। ফাঁকা রাখলে ব্যাজ দেখাবে না)</label><input id="cbd" placeholder="ব্যাজের লেখা">${colorField("cbc","")}<textarea id="cnote" rows="3" placeholder="নিয়ম-কানুন (প্রতি লাইনে একটা, ঐচ্ছিক)"></textarea>${imgField("ci","")}<button onclick="aC2()">প্রোডাক্ট যোগ করুন</button></div>`;
+  const form = cg === "_none" ? "" : `<div class="card"><h2>নতুন প্রোডাক্ট</h2><div class="grid"><input id="cn" placeholder="প্রোডাক্টের নাম (যেমন FF Auto Like)"><input id="cl" placeholder="আইডির লেবেল (যেমন Player ID)"></div><label style="font-size:13px;color:var(--mute)">কার্ডের উপরের ব্যাজ (যেমন: ডায়মন্ড টপআপ, উইকলি, মান্থলি। ফাঁকা রাখলে ব্যাজ দেখাবে না)</label><input id="cbd" placeholder="ব্যাজের লেখা">${colorField("cbc","")}<label style="font-size:13px;color:var(--mute)">${FIELDS_HINT}</label><textarea id="cfields" rows="5" placeholder="Gmail id | email&#10;Password | password&#10;9 Digit Backup Code | number&#10;Telegram User name | text | ঐচ্ছিক"></textarea><textarea id="cnote" rows="3" placeholder="নিয়ম-কানুন (প্রতি লাইনে একটা, ঐচ্ছিক)"></textarea>${imgField("ci","")}<button onclick="aC2()">প্রোডাক্ট যোগ করুন</button></div>`;
   return form + `<div class="card"><h2>প্রোডাক্ট (${list.length})</h2>${list.length?`<div class="scroll"><table><tr><th>ছবি</th><th>নাম</th><th>ব্যাজ</th><th>ভেতরে</th><th>অ্যাকশন</th></tr>${rows}</table></div>`:`<p class="empty">এই ক্যাটাগরিতে এখনো কোনো প্রোডাক্ট নেই।</p>`}</div>`;
 }
 window.aC2 = () => { const n = v("cn").trim(); if(!n){toast("নাম লিখুন");return}
-  const d = {name:n, idLabel:v("cl").trim(), note:v("cnote").trim(), image:v("ci"), groupId:cg, badge:v("cbd").trim(), badgeColor:v("cbc").trim(),
+  const d = {name:n, idLabel:v("cl").trim(), fields:parseFields(v("cfields")), note:v("cnote").trim(), image:v("ci"), groupId:cg, badge:v("cbd").trim(), badgeColor:v("cbc").trim(),
     order:S.categories.filter(c => c.groupId === cg).length+1, createdAt:serverTimestamp()};
-  clr(["cn","cl","cnote","ci","cbd","cbc"]);
+  clr(["cn","cl","cfields","cnote","ci","cbd","cbc"]);
   run(() => addDoc(collection(db, C.categories), d), "প্রোডাক্ট যোগ হয়েছে") };
 window.eC2 = id => { const c = fnd(S.categories, id);
-  openEdit("প্রোডাক্ট এডিট", [["নাম",c.name],["ক্যাটাগরি",c.groupId||"","sel",`<option value="">(ক্যাটাগরি ছাড়া)</option>`+opts(S.groups, c.groupId)],["আইডির লেবেল (যেমন Player ID)",c.idLabel||""],["নিয়ম-কানুন (প্রতি লাইনে একটা)",c.note||"","ta"],["ক্রম (ছোট সংখ্যা আগে)",c.order ?? "","number"],["ছবি",c.image||"","img"],["কার্ডের উপরের ব্যাজের লেখা (ফাঁকা = ব্যাজ নেই)",c.badge||""],["ব্যাজের রং",c.badgeColor||"","color"]],
-    r => run(() => updateDoc(doc(db, C.categories, id), {name:r[0].trim(), groupId:r[1], idLabel:r[2].trim(), note:r[3].trim(), order:Number(r[4])||0, image:r[5], badge:r[6].trim(), badgeColor:r[7].trim()}), "আপডেট হয়েছে")) };
+  openEdit("প্রোডাক্ট এডিট", [["নাম",c.name],["ক্যাটাগরি",c.groupId||"","sel",`<option value="">(ক্যাটাগরি ছাড়া)</option>`+opts(S.groups, c.groupId)],["আইডির লেবেল (যেমন Player ID)",c.idLabel||""],[FIELDS_HINT,fieldsToText(c.fields),"ta"],["নিয়ম-কানুন (প্রতি লাইনে একটা)",c.note||"","ta"],["ক্রম (ছোট সংখ্যা আগে)",c.order ?? "","number"],["ছবি",c.image||"","img"],["কার্ডের উপরের ব্যাজের লেখা (ফাঁকা = ব্যাজ নেই)",c.badge||""],["ব্যাজের রং",c.badgeColor||"","color"]],
+    r => run(() => updateDoc(doc(db, C.categories, id), {name:r[0].trim(), groupId:r[1], idLabel:r[2].trim(), fields:parseFields(r[3]), note:r[4].trim(), order:Number(r[5])||0, image:r[6], badge:r[7].trim(), badgeColor:r[8].trim()}), "আপডেট হয়েছে")) };
 
 /* স্তর ৩: ক্যাটাগরির প্রাইস লিস্ট */
 function lvProds(){
@@ -451,13 +466,13 @@ window.aP2 = () => { const n = v("npn").trim(), pr = Number(v("npp"));
 /* ---------- নোটিশ, পপ-আপ, ব্যানার ---------- */
 function rNotice(){
   const a = S.site.ann, p = S.site.popup, b = S.site.banners;
-  $("main").innerHTML = `<div class="card"><h2>উপরের নোটিশ বার</h2><textarea id="at" rows="2">${esc(a.text)}</textarea><label class="chk"><input type="checkbox" id="aa"${a.active?" checked":""}> চালু রাখুন</label><button onclick="sA()">নোটিশ সেভ করুন</button></div>
-  <div class="card"><h2>পপ-আপ</h2><input id="pt" placeholder="শিরোনাম" value="${esc(p.title)}"><textarea id="pm" rows="3" placeholder="মেসেজ">${esc(p.message)}</textarea>${imgField("pim",p.image||"")}<label class="chk"><input type="checkbox" id="pa"${p.active?" checked":""}> চালু রাখুন</label><div class="acts"><button onclick="sP()">পপ-আপ সেভ করুন</button><button class="b-gr" onclick="showPop()">প্রিভিউ দেখুন</button></div></div>
+  $("main").innerHTML = `<div class="card"><h2>উপরের নোটিশ বার</h2><textarea id="at" rows="2">${esc(a.text)}</textarea><div class="grid"><div><label style="font-size:13px;color:var(--mute)">বারের রং</label><input id="abg" type="color" value="${esc(a.bg||"#e11d48")}" style="height:42px;padding:2px"></div><div><label style="font-size:13px;color:var(--mute)">লেখার রং</label><input id="afg" type="color" value="${esc(a.color||"#ffffff")}" style="height:42px;padding:2px"></div></div><label style="font-size:13px;color:var(--mute)">স্লাইডের স্পিড (১ = ধীর, ১০ = খুব দ্রুত)</label><input id="asp" type="number" min="1" max="10" step="1" value="${Number(a.speed)||6}"><label class="chk"><input type="checkbox" id="aa"${a.active?" checked":""}> চালু রাখুন</label><button onclick="sA()">নোটিশ সেভ করুন</button></div>
+  <div class="card"><h2>পপ-আপ</h2><input id="pt" placeholder="শিরোনাম" value="${esc(p.title)}"><textarea id="pm" rows="3" placeholder="মেসেজ">${esc(p.message)}</textarea>${imgField("pim",p.image||"")}<label style="font-size:13px;color:var(--mute)">ছবিতে ক্লিক করলে যে লিঙ্কে যাবে (যেমন টেলিগ্রাম চ্যানেল। ফাঁকা = কিছু হবে না)</label><input id="plk" placeholder="https://t.me/yourchannel" value="${esc(p.link||"")}"><label class="chk"><input type="checkbox" id="pa"${p.active?" checked":""}> চালু রাখুন</label><div class="acts"><button onclick="sP()">পপ-আপ সেভ করুন</button><button class="b-gr" onclick="showPop()">প্রিভিউ দেখুন</button></div></div>
   <div class="card"><h2>স্লাইডার ব্যানার (৩টা)</h2>${[0,1,2].map(i=>`<small style="color:var(--mute)">ব্যানার ${i+1}</small>${imgField("bn"+i,b[i]||"")}`).join("")}<button onclick="sB()">ব্যানার সেভ করুন</button></div>`;
 }
 const saveSite = (patch, msg) => run(() => setDoc(doc(db, ...SETTINGS), patch, {merge:true}), msg);
-window.sA = () => saveSite({ann:{text:v("at"), active:$("aa").checked}}, "নোটিশ সেভ হয়েছে");
-window.sP = () => saveSite({popup:{title:v("pt"), message:v("pm"), image:v("pim"), active:$("pa").checked}}, "পপ-আপ সেভ হয়েছে");
+window.sA = () => saveSite({ann:{text:v("at"), active:$("aa").checked, bg:v("abg"), color:v("afg"), speed:Math.max(1,Math.min(10,Number(v("asp"))||6))}}, "নোটিশ সেভ হয়েছে");
+window.sP = () => { const lk = v("plk").trim(); if(!urlOk(lk)){ toast("লিঙ্কটা ঠিক নেই"); return } return saveSite({popup:{title:v("pt"), message:v("pm"), image:v("pim"), link:lk, active:$("pa").checked}}, "পপ-আপ সেভ হয়েছে") };
 window.sB = () => saveSite({banners:[0,1,2].map(i => v("bn"+i))}, "ব্যানার সেভ হয়েছে");
 window.showPop = () => { $("popBody").innerHTML = (v("pim")?`<img src="${esc(v("pim"))}" alt="" style="width:100%;border-radius:10px;margin-bottom:10px">`:"") + `<h2 style="font-size:18px">${esc(v("pt"))}</h2><p>${esc(v("pm"))}</p>`; $("pop").classList.add("on") };
 
@@ -494,9 +509,17 @@ function rSiteCfg(){
     <p style="color:var(--mute);margin-bottom:8px">সাইটের নিচের Contact Us এ Telegram ও WhatsApp দুটো কার্ড দেখাবে। লিঙ্ক বদলে সেভ করলেই সাইটে বদলে যাবে। WhatsApp ফাঁকা রাখলে ওই কার্ড লুকিয়ে যাবে।</p>
     <label style="font-size:13px;color:var(--mute)">Telegram লিঙ্ক</label>
     <input id="lk_ct" placeholder="https://t.me/yourusername" value="${esc(lk.contactTelegram||"")}">
-    <label style="font-size:13px;color:var(--mute)">WhatsApp লিঙ্ক বা নম্বর</label>
-    <input id="lk_cw" placeholder="https://wa.me/8801XXXXXXXXX অথবা 8801XXXXXXXXX" value="${esc(lk.contactWhatsapp||"")}">
+    <label style="font-size:13px;color:var(--mute)">WhatsApp চ্যানেলের লিঙ্ক (যেমন https://whatsapp.com/channel/XXXX)</label>
+    <input id="lk_cw" placeholder="https://whatsapp.com/channel/XXXXXXXX" value="${esc(lk.contactWhatsapp||"")}">
     <button onclick="sContact()">Contact Us সেভ করুন</button></div>
+
+  <div class="card"><h2>হোম পেজের বাটন (ব্যানারের নিচের ২টা)</h2>
+    <p style="color:var(--mute);margin-bottom:8px">হোম পেজে ব্যানারের নিচের Telegram (Support) আর Join Group বাটনের লিঙ্ক। ফাঁকা রাখলে আগের লিঙ্কই থাকবে।</p>
+    <label style="font-size:13px;color:var(--mute)">Telegram Support লিঙ্ক</label>
+    <input id="lk_qs" placeholder="https://t.me/yoursupport" value="${esc(lk.quickSupport||"")}">
+    <label style="font-size:13px;color:var(--mute)">Join Group লিঙ্ক</label>
+    <input id="lk_qg" placeholder="https://t.me/yourgroup" value="${esc(lk.quickGroup||"")}">
+    <button onclick="sQuick()">হোম বাটন সেভ করুন</button></div>
 
   <div class="card"><h2>Help বাটন (ডানদিকের নিচের কোণা)</h2>
     <p style="color:var(--mute);margin-bottom:8px">হেল্প বাটন চাপলে যে ৩টা লিঙ্ক খোলে। ফাঁকা রাখলে আগের লিঙ্কই থাকবে।</p>
@@ -504,8 +527,6 @@ function rSiteCfg(){
     <input id="lk_ht" placeholder="https://t.me/yourchannel" value="${esc(lk.helpTelegram||"")}">
     <label style="font-size:13px;color:var(--mute)">Join Group লিঙ্ক</label>
     <input id="lk_hg" placeholder="https://t.me/yourgroup" value="${esc(lk.helpGroup||"")}">
-    <label style="font-size:13px;color:var(--mute)">YouTube লিঙ্ক</label>
-    <input id="lk_hy" placeholder="https://youtube.com/@yourchannel" value="${esc(lk.helpYoutube||"")}">
     <button onclick="sHelp()">Help বাটন সেভ করুন</button></div>`;
 }
 const ck = id => $(id) ? $(id).checked : false;
@@ -519,10 +540,14 @@ window.sContact = () => {
   const t = v("lk_ct").trim(), w = v("lk_cw").trim();
   if(!urlOk(t) || !urlOk(w)){ toast("লিঙ্কটা ঠিক নেই"); return }
   saveSite({links:{contactTelegram:t, contactWhatsapp:w}}, "Contact Us সেভ হয়েছে") };
+window.sQuick = () => {
+  const a = v("lk_qs").trim(), b = v("lk_qg").trim();
+  if(!urlOk(a) || !urlOk(b)){ toast("লিঙ্কটা ঠিক নেই"); return }
+  saveSite({links:{quickSupport:a, quickGroup:b}}, "হোম বাটনের লিঙ্ক সেভ হয়েছে") };
 window.sHelp = () => {
-  const a = v("lk_ht").trim(), b = v("lk_hg").trim(), c = v("lk_hy").trim();
-  if(!urlOk(a) || !urlOk(b) || !urlOk(c)){ toast("লিঙ্কটা ঠিক নেই"); return }
-  saveSite({links:{helpTelegram:a, helpGroup:b, helpYoutube:c}}, "Help বাটনের লিঙ্ক সেভ হয়েছে") };
+  const a = v("lk_ht").trim(), b = v("lk_hg").trim();
+  if(!urlOk(a) || !urlOk(b)){ toast("লিঙ্কটা ঠিক নেই"); return }
+  saveSite({links:{helpTelegram:a, helpGroup:b}}, "Help বাটনের লিঙ্ক সেভ হয়েছে") };
 
 
 /* ---------- পেমেন্ট সেটিংস (বিকাশ / নগদ / রকেট নম্বর) ---------- */
