@@ -16,6 +16,9 @@
 <style>
 /* অ্যাডমিন ডেটা আসার আগে পুরনো ব্যানার/পপ-আপ ছবি লুকানো থাকে */
 html.ff-wait #track .slide img,html.ff-wait #pop .pimg img{opacity:0}
+html.ff-wait #pop .pbody{opacity:0}
+#pop .pbody{transition:opacity .25s ease}
+#pop .pbody:empty,#pop .pbody p:empty{display:none}
 html.ff-wait-cat #gridFF>a.card,html.ff-wait-cat .pk-grid>.pk{visibility:hidden}
 html.ff-wait-cat #gridFF{min-height:190px;border-radius:16px;background:linear-gradient(100deg,#eef2fb 30%,#f8faff 50%,#eef2fb 70%);background-size:200% 100%;animation:ffSk 1.1s linear infinite}
 @keyframes ffSk{from{background-position:200% 0}to{background-position:-200% 0}}
@@ -37,6 +40,26 @@ html.ff-wait #track .slide{background:linear-gradient(100deg,#e6ecf8 30%,#f4f7fd
   if(!hadCache) d.classList.add('ff-wait-cat');
   window.ffCatReady=function(){ d.classList.remove('ff-wait-cat'); };
   setTimeout(window.ffCatReady, 4000);
+})();
+</script>
+<script>
+/* আগের ভিজিটের পপ-আপ লেখা সাথে সাথে বসানো (Firebase-এর জন্য অপেক্ষা না করে) */
+(function(){
+  function fill(){
+    try{
+      var raw = localStorage.getItem('ff_site_cache'); if(!raw) return;
+      var p = (JSON.parse(raw) || {}).popup;
+      var pt = document.getElementById('popText');
+      if(!p || !p.active || !pt || !(p.message || p.title)) return;
+      pt.textContent = '';
+      if(p.title){ var b = document.createElement('b'); b.textContent = p.title; pt.appendChild(b); pt.appendChild(document.createElement('br')); }
+      String(p.message || '').split(/\r?\n/).forEach(function(line, i){ if(i) pt.appendChild(document.createElement('br')); pt.appendChild(document.createTextNode(line)); });
+      if(p.image && /^(data:image\/|https?:)/.test(p.image)){ var im = document.querySelector('#pop .pimg img'); if(im) im.src = p.image; }
+      window.__ffPopCached = true;
+      if(window.ffSiteReady) window.ffSiteReady();
+    }catch(e){}
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
 })();
 </script>
 <script>
@@ -309,6 +332,22 @@ footer .about h2{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.
 
 /* ===== কার্ডের উপরের ব্যাজ (অ্যাডমিন থেকে লেখা ও রং) ===== */
 .card .cbadge{position:absolute;top:8px;right:8px;z-index:3;max-width:calc(100% - 16px);padding:4px 10px;border-radius:99px;color:#fff;font-size:11px;font-weight:800;line-height:1.35;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 3px 8px -2px rgba(0,0,0,.35);pointer-events:none}
+
+/* ===== ব্যাজ কার্ডের উপরের কোনায় বাইরে (NewTopUp স্টাইল) ===== */
+.card{overflow:visible !important;contain:none !important}
+.card .thumb{border-radius:18px 18px 0 0;overflow:hidden}
+.card .cbadge{top:-12px !important;right:-2px !important;left:auto !important;max-width:calc(100% + 2px) !important;padding:6px 13px !important;font-size:12.5px !important;font-weight:700 !important;line-height:1.2 !important;border-radius:99px !important;overflow:visible !important;text-overflow:clip !important;box-shadow:0 6px 14px -4px rgba(0,0,0,.45) !important;z-index:5 !important}
+#gridFF,.grid{padding-top:14px}
+/* ===== উপরের হেডার বার চিকন (ছোট লোগো, ওয়ালেট ও প্রোফাইল) ===== */
+.hd{height:54px !important}
+.logo{height:36px !important;max-width:125px !important}
+.wallet{height:34px !important;padding:0 13px 0 10px !important;font-size:14px !important;gap:6px !important}
+.wallet svg{font-size:17px !important}
+.avatar{width:36px !important;height:36px !important}
+.avatar .av-inner svg{width:19px !important;height:19px !important}
+.avatar .av-inner img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.hr{gap:10px !important}
+
 
 /* popup */
 .pop{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px 20px 46px;background:rgba(10,22,55,.55);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;pointer-events:none;transition:opacity .3s}
@@ -1783,7 +1822,7 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
   <div class="pbox">
     <div class="pimg ph"><img src="Notification.jpg" alt="Notification"></div>
     <div class="pbody">
-      <p id="popText">সবথেকে কম দামে টপ করার জন্য সেরা ওয়েবসাইট<br>১০০% বিশ্বস্ত ও দ্রুত ডেলিভারিতে<br>অর্ডার করুন নিশ্চিন্তে 🥰</p>
+      <p id="popText"></p>
     </div>
     <button class="pclose" id="pclose"><svg class="i"><use href="#x"/></svg>CLOSE</button>
   </div>
@@ -2198,6 +2237,8 @@ setInterval(fetchFreshAccountConfig, 60000);
 (function(){
   var pop = document.getElementById('pop');
   function openP(){
+    var pt0 = document.getElementById('popText');
+    if (pt0 && !pt0.textContent.trim()) return;   /* অ্যাডমিন থেকে কোনো লেখা না এলে ফাঁকা পপ-আপ দেখাবে না */
     if (typeof window.syncAccountLinks === 'function') window.syncAccountLinks();
     pop.classList.add('show');
     document.body.style.overflow='hidden';
@@ -4192,7 +4233,8 @@ function applyRecent(d){
 /* আগের ভিজিটের সেটিংস থাকলে সাথে সাথে বসানো: ব্যানার ও পপ-আপ অপেক্ষা ছাড়াই আসবে */
 try {
   const raw = localStorage.getItem('ff_site_cache');
-  if (raw) { const c = JSON.parse(raw); applySite({ banners: c.banners });   /* নোটিশ/পপ-আপের লেখা ক্যাশ থেকে নয়, সরাসরি লাইভ ডেটা থেকে আসবে */ }
+  if (raw) { const c = JSON.parse(raw); applySite({ banners: c.banners, popup: c.popup });   /* আগের ভিজিটের পপ-আপ সাথে সাথে বসে, তারপর লাইভ ডেটা এলে নিজে আপডেট হয় */
+  if (c && c.popup && (c.popup.message || c.popup.title)) { if (window.ffSiteReady) window.ffSiteReady(); } }
 } catch (err) { console.warn('cache:', err); }
 onSnapshot(doc(db, 'settings', 'site'), s => {
   if (s.exists()) {
