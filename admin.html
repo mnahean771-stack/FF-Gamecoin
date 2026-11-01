@@ -384,11 +384,17 @@ function clr(ids){ ids.forEach(i => { const e = $(i); if(e) e.value = ""; const 
 /* স্তর ১: গ্রুপ (যেমন: Free Fire Top Up, Others Game) */
 function lvGroups(){
   const gs = S.groups.slice().sort(byOrder), none = S.categories.filter(noGroup);
-  const rows = gs.map(g => `<tr><td>${img(g.image)}</td><td>${esc(g.name)}</td><td>${S.categories.filter(c=>c.groupId===g.id).length}টি প্রোডাক্ট</td><td><div class="acts"><button class="sm" onclick="cgo('${g.id}',null)">খুলুন</button><button class="b-gr sm" onclick="eG('${g.id}')">এডিট</button><button class="b-bad sm" onclick="dG('${g.id}')">ডিলিট</button></div></td></tr>`).join("");
+  const rows = gs.map((g,i) => `<tr><td>${img(g.image)}</td><td>${esc(g.name)}</td><td>${S.categories.filter(c=>c.groupId===g.id).length}টি প্রোডাক্ট</td><td><div class="acts"><button class="b-gr sm" title="উপরে তুলুন" ${i===0?'disabled style="opacity:.35"':''} onclick="mvG('${g.id}',-1)">↑</button><button class="b-gr sm" title="নিচে নামান" ${i===gs.length-1?'disabled style="opacity:.35"':''} onclick="mvG('${g.id}',1)">↓</button><button class="sm" onclick="cgo('${g.id}',null)">খুলুন</button><button class="b-gr sm" onclick="eG('${g.id}')">এডিট</button><button class="b-bad sm" onclick="dG('${g.id}')">ডিলিট</button></div></td></tr>`).join("");
   const noneBox = none.length ? `<div class="card"><h2>ক্যাটাগরির বাইরে ${none.length}টা প্রোডাক্ট আছে</h2><p style="color:var(--mute);margin-bottom:10px">এগুলো সাইটে এখনকার মতোই দেখাবে। কোনো ক্যাটাগরির ভেতরে ঢোকাতে চাইলে নিচের বোতাম চাপুন।</p><div class="acts"><button onclick="migG()">একটা ক্যাটাগরি বানিয়ে সবগুলো ঢোকান</button><button class="b-gr" onclick="cgo('_none',null)">দেখুন</button></div></div>` : "";
   return noneBox + `<div class="card"><h2>নতুন ক্যাটাগরি</h2><p style="color:var(--mute);margin-bottom:8px">ক্যাটাগরি হলো সাইটের হোমের এক-একটা সেকশন (যেমন "FREE FIRE TOPUP", "PUBG")। এর ভেতরে প্রোডাক্ট থাকবে।</p><input id="gn" placeholder="ক্যাটাগরির নাম (যেমন PUBG)">${imgField("gi","")}<button onclick="aG()">ক্যাটাগরি যোগ করুন</button></div>
-  <div class="card"><h2>সব ক্যাটাগরি (${gs.length})</h2>${gs.length?`<div class="scroll"><table><tr><th>ছবি</th><th>নাম</th><th>ভেতরে</th><th>অ্যাকশন</th></tr>${rows}</table></div>`:`<p class="empty">কোনো ক্যাটাগরি নেই। উপর থেকে যোগ করুন।</p>`}</div>`;
+  <div class="card"><h2>সব ক্যাটাগরি (${gs.length})</h2><p style="color:var(--mute);margin-bottom:8px">↑ ↓ চেপে ক্যাটাগরির ক্রম বদলান। যেটা উপরে থাকবে সেটা সাইটে আগে দেখাবে।</p>${gs.length?`<div class="scroll"><table><tr><th>ছবি</th><th>নাম</th><th>ভেতরে</th><th>অ্যাকশন</th></tr>${rows}</table></div>`:`<p class="empty">কোনো ক্যাটাগরি নেই। উপর থেকে যোগ করুন।</p>`}</div>`;
 }
+window.mvG = (id, dir) => {
+  const gs = S.groups.slice().sort(byOrder), i = gs.findIndex(g => g.id === id), j = i + dir;
+  if(i < 0 || j < 0 || j >= gs.length) return;
+  [gs[i], gs[j]] = [gs[j], gs[i]];
+  run(async () => { const b = writeBatch(db); gs.forEach((g, k) => b.update(doc(db, C.groups, g.id), {order:k+1})); await b.commit(); }, "ক্রম বদলানো হয়েছে");
+};
 window.aG = () => { const n = v("gn").trim(), im = v("gi"); if(!n){toast("নাম লিখুন");return}
   clr(["gn","gi"]);
   run(() => addDoc(collection(db, C.groups), {name:n, image:im, order:S.groups.length+1, createdAt:serverTimestamp()}), "ক্যাটাগরি যোগ হয়েছে") };

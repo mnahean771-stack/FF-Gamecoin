@@ -339,6 +339,10 @@ footer .about h2{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.
 .card .cbadge{top:-12px !important;right:-2px !important;left:auto !important;max-width:calc(100% + 2px) !important;padding:6px 13px !important;font-size:12.5px !important;font-weight:700 !important;line-height:1.2 !important;border-radius:99px !important;overflow:visible !important;text-overflow:clip !important;box-shadow:0 6px 14px -4px rgba(0,0,0,.45) !important;z-index:5 !important}
 #gridFF,.grid{padding-top:14px}
 
+/* ===== ব্যানার স্লাইডার হালকা (কালো বর্ডার/ছায়া সরানো) ===== */
+.hero{border:1.5px solid #dfe6f3 !important;box-shadow:0 6px 18px -6px rgba(30,60,120,.22) !important;background:#eef2fa !important;border-radius:20px !important}
+.slide{background:#eef2fa !important}
+
 /* ===== কার্ড ছোট ও সুন্দর (NewTopUp স্টাইল) ===== */
 .grid{gap:14px !important;padding-left:6px;padding-right:6px}
 .card{border-radius:16px !important;border:1.5px solid #dfe6f3 !important;box-shadow:0 3px 10px -2px rgba(30,60,120,.16) !important}
@@ -347,8 +351,19 @@ footer .about h2{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.
 .card .thumb{border-radius:14px 14px 0 0 !important}
 .card p{min-height:42px !important;padding:6px 4px !important;font-size:11px !important;font-weight:600 !important;letter-spacing:0 !important;line-height:1.25}
 
+/* ===== কাটা কোণ: উপরের বাম কোণ কোনাকুনি কাটা, বাকি তিন কোণ গোল (সব কার্ডে, নতুনগুলোতেও) ===== */
+.card{--cut:20px;border-radius:0 16px 16px 16px !important;background:transparent !important;border:0 !important;box-shadow:none !important;filter:drop-shadow(0 3px 6px rgba(30,60,120,.18)) !important;transition:transform .25s cubic-bezier(.2,1,.3,1),filter .25s !important}
+.card:hover{transform:translateY(-3px);filter:drop-shadow(0 8px 12px rgba(30,60,120,.26)) !important;box-shadow:none !important}
+.card:active{transform:translateY(1px);filter:drop-shadow(0 2px 4px rgba(30,60,120,.2)) !important;box-shadow:none !important}
+.card:before{display:none !important}
+.card>.thumb,.card>p{background:#fff}
+.card>.thumb{position:relative;border-radius:0 !important;clip-path:polygon(var(--cut) 0,100% 0,100% 100%,0 100%,0 var(--cut));border:1.5px solid #dfe6f3;border-bottom:0}
+.card>p{border:1.5px solid #dfe6f3;border-top:0;border-radius:0 0 16px 16px}
+/* কাটা জায়গার কোনাকুনি বর্ডার দাগ */
+.card:after{content:"";position:absolute;left:0;top:0;width:var(--cut);height:var(--cut);z-index:4;pointer-events:none;background:linear-gradient(135deg,transparent calc(50% - 1px),#dfe6f3 calc(50% - 1px),#dfe6f3 calc(50% + .6px),transparent calc(50% + .6px))}
+
 /* ===== উপরের টাইটেল/ব্যাজে হালকা গ্লো ===== */
-.card .cbadge{--bc:#2563eb;padding:5px 11px !important;font-size:11.5px !important;top:-11px !important;text-shadow:0 0 6px rgba(255,255,255,.55);animation:cbGlow 2.4s ease-in-out infinite;box-shadow:0 0 8px 1px var(--bc),0 4px 10px -4px rgba(0,0,0,.4) !important}
+.card .cbadge{--bc:#2563eb;padding:3px 9px !important;font-size:10.5px !important;font-weight:600 !important;line-height:1.15 !important;top:-9px !important;text-shadow:0 0 6px rgba(255,255,255,.55);animation:cbGlow 2.4s ease-in-out infinite;box-shadow:0 0 8px 1px var(--bc),0 4px 10px -4px rgba(0,0,0,.4) !important}
 @keyframes cbGlow{
   0%,100%{box-shadow:0 0 6px 0 var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
   50%{box-shadow:0 0 14px 3px var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
@@ -3641,6 +3656,13 @@ function renderCatalog(cats, prods, groups){
     const gr = document.createElement("div"); gr.className = "grid"; gr.dataset.dynSec = "1";
     anchor.after(sec); sec.after(gr); anchor = gr; grids[g.id] = gr; secs[g.id] = sec;
   });
+  /* অ্যাডমিনের ক্রম অনুযায়ী সব সেকশন সাজানো (ফ্রি ফায়ারও উপরে-নিচে যেতে পারবে) */
+  if (legacyGid) {
+    const mk = document.createComment("ffsec"); secFF.before(mk);
+    let at = mk;
+    gl.forEach(g => { const sc = secs[g.id], gd = grids[g.id]; if (!sc || !gd) return; at.after(sc); sc.after(gd); at = gd; });
+    mk.remove();
+  }
 
   Object.keys(cats).forEach(id => {
     const c = cats[id];
