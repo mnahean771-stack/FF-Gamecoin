@@ -823,6 +823,19 @@ html,body,.pk,.po,.btn,.pay,.q,.card,.nav a,.pv-back{touch-action:manipulation}
 .help[hidden]{display:none}
 .help+.help{margin-top:12px}
 .help.wa .ti{background:#25d366;color:#fff}
+
+/* ===== Contact (Telegram + WhatsApp) সব জায়গায় ===== */
+.pv-help.wa{margin-top:10px}
+.pv-help.wa .ti{background:#25d366}
+.pv-contact .pv-help[hidden]{display:none}
+.or-ct{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--bd)}
+.or-ct a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:12px;font-size:13px;font-weight:700;color:#fff;background:#0a8fd6}
+.or-ct a.wa{background:#25d366}
+.or-ct a svg{width:16px;height:16px}
+.or-ct a[hidden]{display:none}
+.cd-card .or-ct{margin-top:10px}
+.pv-contact.gen{padding-bottom:6px}
+
 /* ===== Recent Orders ===== */
 .rc{margin-top:34px}
 .rc[hidden]{display:none}
@@ -2874,8 +2887,9 @@ setInterval(fetchFreshAccountConfig, 60000);
           '<div class="or-row">'+ICO.pkg+'<span>Package</span><b>'+esc(o.package)+'</b></div>'+
           '<div class="or-row">'+ICO.card+'<span>Total Price</span><b>৳'+price+'</b></div>'+
           '<div class="or-row">'+ICO.user+'<span>Player ID</span><b>'+esc(o.playerId)+'</b></div>'+
-        '</div>';
+        '</div>'+(window.ffContactRow?window.ffContactRow():'');
       list.appendChild(c);
+      if(window.ffPaintLinks) window.ffPaintLinks();
     });
   };
   window.renderOrders([]); // এখন ফাঁকা
@@ -2917,8 +2931,9 @@ setInterval(fetchFreshAccountConfig, 60000);
     empty.style.display=codes.length?'none':'flex';
     codes.forEach(function(c){
       var d=document.createElement('div'); d.className='cd-card';
-      d.innerHTML='<b>'+esc(c.title)+'</b><code>'+esc(c.code)+'</code>';
+      d.innerHTML='<b>'+esc(c.title)+'</b><code>'+esc(c.code)+'</code>'+(window.ffContactRow?window.ffContactRow():'');
       list.appendChild(d);
+      if(window.ffPaintLinks) window.ffPaintLinks();
     });
   };
   window.renderCodes([]);
@@ -3894,6 +3909,7 @@ function paintLinks(){
   document.querySelectorAll('[data-contact="whatsapp"]').forEach(a => { if (cw) { setHref(a, cw); a.hidden = false; } else a.hidden = true; });
 }
 function applyLinks(d){ window.__ffLinks = d.links || {}; paintLinks(); }
+window.ffPaintLinks = paintLinks;
 (function(){
   const orig = window.syncAccountLinks;      // account.js লিঙ্ক বসানোর পরে অ্যাডমিনের লিঙ্ক আবার বসবে
   window.syncAccountLinks = function(){ if (orig) orig.apply(this, arguments); paintLinks(); };
@@ -3909,7 +3925,11 @@ const RC_ST = {
 const RC_COL = ['#2e7d32','#d84315','#6a1b9a','#00838f','#c2185b','#1565c0','#ef6c00','#455a64','#558b2f','#ad1457'];
 function applyRecent(d){
   const sec = $('recentSec'), list = $('recentList'); if (!sec || !list) return;
-  const arr = Array.isArray(d.recent) ? d.recent.slice(0, 10) : [];
+  window.__ffRecentD = d || {};
+  // লাইভ (pending/processing) অর্ডার আগে, তারপর অ্যাডমিনের রিসেন্ট তালিকা
+  const live = Array.isArray(window.__ffLive) ? window.__ffLive : [];
+  const base = Array.isArray(d.recent) ? d.recent : [];
+  const arr = live.concat(base).slice(0, 10);
   list.textContent = '';
   if (!arr.length) { sec.hidden = true; return; }
   arr.forEach((r, i) => {
@@ -3932,6 +3952,7 @@ function applyRecent(d){
 /* আগের ভিজিটের সেটিংস থাকলে সাথে সাথে বসানো: ব্যানার ও পপ-আপ অপেক্ষা ছাড়াই আসবে */
 
 window.ffApplySite = applySite;
+window.ffRepaintRecent = function(){ try { applyRecent(window.__ffRecentD || {}); } catch (e) { console.warn(e); } };
 function boot(){
   try {
     var c = window.__ffBoot;
@@ -3949,7 +3970,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
    ===================================================================== */
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, onSnapshot, collection, query, where, getDocs, setDoc, runTransaction, serverTimestamp }
+import { getFirestore, doc, getDoc, onSnapshot, collection, query, where, getDocs, setDoc, runTransaction, serverTimestamp, orderBy, limit }
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 const cfg = {
@@ -4029,9 +4050,37 @@ onAuthStateChanged(auth, u => {
   unsubOrders = onSnapshot(query(collection(db, 'orders'), where('userId', '==', u.uid)), s => {
     myOrders = s.docs.map(d => ({ id: d.id, ...d.data() }));
     myOrders.sort((a, b) => ((b.createdAt && b.createdAt.seconds) || 9e9) - ((a.createdAt && a.createdAt.seconds) || 9e9));
-    drawOrders(); pushBalance();
+    drawOrders(); pushBalance(); rebuildLive(liveDocs);
   }, e => console.warn('orders:', e.code));
 });
+
+/* ---------- লাইভ Recent Orders: সবার pending অর্ডার (recent_orders কালেকশন) ---------- */
+window.__ffLive = [];
+const LIVE_MAX_AGE = 6 * 3600;   // ৬ ঘণ্টার পুরনো pending আর দেখাবে না
+function rebuildLive(docs){
+  const now = Date.now() / 1000, mine = {};
+  myOrders.forEach(o => { mine[o.id] = o.status; });
+  window.__ffLive = docs.map(r => {
+    const ts = (r.createdAt && r.createdAt.seconds) || now;
+    let st = r.status || 'pending';
+    if (mine[r.orderId]) st = mine[r.orderId];          // নিজের অর্ডারের আসল স্ট্যাটাস
+    return { name: r.name, item: r.item, status: st, ts };
+  }).filter(r => (r.status === 'pending' || r.status === 'processing') && now - r.ts < LIVE_MAX_AGE);
+  if (window.ffRepaintRecent) window.ffRepaintRecent();
+}
+let liveDocs = [];
+onSnapshot(query(collection(db, 'recent_orders'), orderBy('createdAt', 'desc'), limit(10)), s => {
+  liveDocs = s.docs.map(d => d.data());
+  rebuildLive(liveDocs);
+}, e => console.warn('recent_orders:', e.code));
+async function mirrorRecent(orderId, itemName, qty){
+  try {
+    const u = auth.currentUser; if (!u) return;
+    const name = ((myUser && myUser.name) || u.displayName || (u.email || '').split('@')[0] || 'User').slice(0, 40);
+    const item = (String(itemName) + (qty > 1 ? ' x' + qty : '')).slice(0, 80);
+    await setDoc(doc(db, 'recent_orders', orderId), { userId: u.uid, orderId: orderId, name: name, item: item, status: 'pending', createdAt: serverTimestamp() });
+  } catch (e) { console.warn('recent mirror:', e.code || e); }
+}
 
 /* ---------- অর্ডার দেওয়া (ব্যালেন্স কাটা + অর্ডার সেভ, একসাথে) ---------- */
 let busy = false;
@@ -4076,6 +4125,7 @@ window.ffPlaceOrder = async function(o){
         status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
     });
+    mirrorRecent(orderRef.id, o.name, qty);
     toast('অর্ডার সফল হয়েছে ✅ ' + o.name + (qty > 1 ? ' × ' + qty : ''));
     location.hash = 'my-orders';
   } catch (e) {
@@ -4189,6 +4239,7 @@ window.ffPlaceOrder = async function(o){
             status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
           });
         } catch (e) { console.warn('order save:', e.code); saved = false; }
+        if (saved) mirrorRecent(orderRef.id, cur.name, cur.qty);
 
         // ৪) Telegram-এ অর্ডারের পুরো তথ্য পাঠানো (সার্ভারের মাধ্যমে)
         let tgOk = false;
@@ -4293,6 +4344,41 @@ onSnapshot(doc(db, 'settings', 'site'), s => {
 })();
 </script>
 
+<script>
+/* Contact Us (Telegram + WhatsApp): প্রতিটা পেজে, অর্ডার/কোড কার্ডে — নতুন প্রোডাক্ট পেজেও অটো বসবে */
+(function(){
+  var WA='<svg class="f" viewBox="0 0 24 24"><path fill="#fff" d="M12 2a10 10 0 0 0-8.6 15L2 22l5.1-1.3A10 10 0 1 0 12 2zm5.2 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7a11 11 0 0 1-4.6-4.1c-.4-.5-1.2-1.6-1.2-3s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6c-.2.2-.3.4-.1.7.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.1.1.6-.1 1.1z"/></svg>';
+  var TG='<svg class="f"><use href="#tg"/></svg>';
+  window.ffContactRow=function(){
+    return '<div class="or-ct"><a href="#" data-link="telegram-channel" data-contact="telegram">'+TG+'Telegram</a>'+
+           '<a class="wa" href="#" data-contact="whatsapp" hidden>'+WA+'WhatsApp</a></div>';
+  };
+  function waCard(){
+    var a=document.createElement('a'); a.className='pv-help wa'; a.href='#'; a.setAttribute('data-contact','whatsapp'); a.hidden=true;
+    a.innerHTML='<span class="ti">'+WA+'</span><span><b>WhatsApp Channel</b><p>আমাদের চ্যানেলে যুক্ত হোন</p></span>';
+    return a;
+  }
+  function ensure(){
+    document.querySelectorAll('main.wrap[id]').forEach(function(m){
+      if(m.id==='homeView') return;                       // হোমে নিচের ফুটারে আছে
+      var sec=m.querySelector('.pv-contact');
+      if(!sec){
+        sec=document.createElement('section'); sec.className='pv-contact gen';
+        sec.innerHTML='<h2>Contact Us</h2><a class="pv-help" href="#" data-link="telegram-channel" data-contact="telegram"><span class="ti">'+TG+'</span><span><b>Telegram HelpLine</b><p>সকাল ৮টা থেকে রাত ১২টা</p></span></a>';
+        m.appendChild(sec);
+      }
+      if(!sec.querySelector('[data-contact="whatsapp"]')) sec.appendChild(waCard());
+    });
+    if(window.ffPaintLinks) window.ffPaintLinks();
+  }
+  function start(){
+    ensure();
+    var t; new MutationObserver(function(){ clearTimeout(t); t=setTimeout(ensure,60); }).observe(document.body,{childList:true});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  window.addEventListener('ff-links',ensure);
+})();
+</script>
 </body>
 </html>
 
