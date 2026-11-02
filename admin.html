@@ -308,6 +308,12 @@ function colorField(id, val){
   const cur = /^#[0-9a-fA-F]{6}$/.test(val || "") ? val : "";
   return `<div class="up" style="flex-wrap:wrap"><input type="color" id="${id}_c" value="${cur || "#2563eb"}" style="width:54px;height:40px;padding:2px;margin:0" oninput="document.getElementById('${id}').value=this.value"><input id="${id}" value="${esc(cur)}" placeholder="#2563eb (ফাঁকা = নীল)" style="flex:1;min-width:130px;margin:0" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('${id}_c').value=this.value"></div><div class="acts" style="margin:4px 0 2px">${BADGE_COLORS.map(c => `<button type="button" title="${c}" style="background:${c};width:28px;height:28px;padding:0;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1" onclick="document.getElementById('${id}').value='${c}';document.getElementById('${id}_c').value='${c}'"></button>`).join("")}</div>`;
 }
+
+/* প্রাইস লিস্টের প্রতি সারির ব্যাজ ঘর: লেখা + রং বাছাই + ছোট প্রিভিউ */
+function pkBadgeCell(id, text, color){
+  const cur = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : "";
+  return `<div style="min-width:190px"><input id="${id}" value="${esc(text||"")}" placeholder="যেমন POPULAR / LIMITED" style="margin:0 0 6px"><div class="up" style="flex-wrap:nowrap;gap:6px"><input type="color" id="${id}_cc" value="${cur||"#2563eb"}" style="width:46px;height:36px;padding:2px;margin:0;flex:none" oninput="document.getElementById('${id}_c').value=this.value"><input id="${id}_c" value="${esc(cur)}" placeholder="#2563eb" style="flex:1;min-width:80px;margin:0" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('${id}_cc').value=this.value"></div><div class="acts" style="margin:6px 0 0;gap:5px">${BADGE_COLORS.map(c => `<button type="button" title="${c}" style="background:${c};width:22px;height:22px;padding:0;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1" onclick="document.getElementById('${id}_c').value='${c}';document.getElementById('${id}_cc').value='${c}'"></button>`).join("")}</div></div>`;
+}
 const badgeTag = c => c && c.badge ? `<span class="tag" style="background:${/^#[0-9a-fA-F]{6}$/.test(c.badgeColor||"") ? c.badgeColor : "#2563eb"};color:#fff">${esc(c.badge)}</span>` : `<span style="color:var(--mute)">-</span>`;
 
 /* ---------- ছবি আপলোড ---------- */
@@ -447,17 +453,19 @@ window.eC2 = id => { const c = fnd(S.categories, id);
 /* স্তর ৩: ক্যাটাগরির প্রাইস লিস্ট */
 function lvProds(){
   const c = fnd(S.categories, cc), list = S.products.filter(p => p.categoryId === cc).sort(byOrder);
-  const rows = list.map(p => `<tr><td><input id="pn_${p.id}" value="${esc(p.name)}" style="min-width:150px"></td><td><input id="pl_${p.id}" value="${esc(p.label||"")}" placeholder="ঐচ্ছিক" style="min-width:150px"></td><td><input id="pp_${p.id}" type="number" min="0" value="${p.price}" style="width:100px"></td><td><input id="po_${p.id}" type="number" value="${p.order ?? ""}" style="width:70px"></td><td><button class="b-bad sm" onclick="del('products','${p.id}')">ডিলিট</button></td></tr>`).join("");
-  return `<div class="card"><h2>${esc(c.name)} — প্রাইস লিস্ট (${list.length})</h2>${list.length?`<p style="color:var(--mute);margin-bottom:8px">নাম বা দাম বদলে নিচের "সব সেভ করুন" চাপুন। "সাইটে দেখানো লেখা" ফাঁকা রাখলে নামই দেখাবে।</p><div class="scroll"><table><tr><th>নাম</th><th>সাইটে দেখানো লেখা</th><th>দাম (৳)</th><th>ক্রম</th><th></th></tr>${rows}</table></div><div class="acts" style="margin-top:12px"><button class="b-ok" onclick="sPL()">সব সেভ করুন</button></div>`:`<p class="empty">এই প্রোডাক্টে এখনো কোনো প্যাকেজ নেই। নিচ থেকে যোগ করুন।</p>`}</div>
-  <div class="card"><h2>নতুন প্যাকেজ</h2><div class="grid"><input id="npn" placeholder="নাম (যেমন 100 Diamond)"><input id="npp" type="number" min="1" placeholder="দাম (টাকা)"><input id="npl" placeholder="সাইটে দেখানো লেখা (ঐচ্ছিক)"></div><button onclick="aP2()">প্যাকেজ যোগ করুন</button></div>`;
+  const rows = list.map(p => `<tr><td><input id="pn_${p.id}" value="${esc(p.name)}" style="min-width:150px"></td><td><input id="pl_${p.id}" value="${esc(p.label||"")}" placeholder="ঐচ্ছিক" style="min-width:150px"></td><td><input id="pp_${p.id}" type="number" min="0" value="${p.price}" style="width:100px"></td><td><input id="po_${p.id}" type="number" value="${p.order ?? ""}" style="width:70px"></td><td>${pkBadgeCell("pb_"+p.id, p.badge, p.badgeColor)}</td><td><button class="b-bad sm" onclick="del('products','${p.id}')">ডিলিট</button></td></tr>`).join("");
+  return `<div class="card"><h2>${esc(c.name)} — প্রাইস লিস্ট (${list.length})</h2>${list.length?`<p style="color:var(--mute);margin-bottom:8px">নাম বা দাম বদলে নিচের "সব সেভ করুন" চাপুন। "সাইটে দেখানো লেখা" ফাঁকা রাখলে নামই দেখাবে। "উপরের ব্যাজ" এ যা খুশি লিখুন (যেমন POPULAR, LIMITED, HOT, নতুন) ও রং বাছুন — ফাঁকা রাখলে ব্যাজ থাকবে না।</p><div class="scroll"><table><tr><th>নাম</th><th>সাইটে দেখানো লেখা</th><th>দাম (৳)</th><th>ক্রম</th><th>উপরের ব্যাজ (লেখা + রং)</th><th></th></tr>${rows}</table></div><div class="acts" style="margin-top:12px"><button class="b-ok" onclick="sPL()">সব সেভ করুন</button></div>`:`<p class="empty">এই প্রোডাক্টে এখনো কোনো প্যাকেজ নেই। নিচ থেকে যোগ করুন।</p>`}</div>
+  <div class="card"><h2>নতুন প্যাকেজ</h2><div class="grid"><input id="npn" placeholder="নাম (যেমন 100 Diamond)"><input id="npp" type="number" min="1" placeholder="দাম (টাকা)"><input id="npl" placeholder="সাইটে দেখানো লেখা (ঐচ্ছিক)"></div><label style="font-size:13px;color:var(--mute)">উপরের ব্যাজ (ঐচ্ছিক — যেমন POPULAR, LIMITED, HOT)</label><input id="npb" placeholder="ব্যাজের লেখা (ফাঁকা = ব্যাজ নেই)">${colorField("npbc","")}<button onclick="aP2()">প্যাকেজ যোগ করুন</button></div>`;
 }
 window.sPL = () => {
   const b = writeBatch(db); let n = 0;
   for(const p of S.products.filter(p => p.categoryId === cc)){
     const nm = v("pn_"+p.id).trim(), lb = v("pl_"+p.id).trim(), pr = Number(v("pp_"+p.id)), ov = v("po_"+p.id);
+    const bd = v("pb_"+p.id).trim(), bc = v("pb_"+p.id+"_c").trim();
+    if(bc && !/^#[0-9a-fA-F]{6}$/.test(bc)){ toast("ব্যাজের রং ঠিক করুন (যেমন #2563eb)"); return }
     if(!nm || !(pr >= 0) || v("pp_"+p.id) === ""){ toast("নাম ও দাম ঠিকঠাক লিখুন"); return }
     const od = ov === "" ? (p.order ?? 9999) : Number(ov);
-    if(nm !== p.name || lb !== (p.label||"") || pr !== Number(p.price) || od !== p.order){ b.update(doc(db, C.products, p.id), {name:nm, label:lb, price:pr, order:od}); n++ }
+    if(nm !== p.name || lb !== (p.label||"") || pr !== Number(p.price) || od !== p.order || bd !== (p.badge||"") || bc !== (p.badgeColor||"")){ b.update(doc(db, C.products, p.id), {name:nm, label:lb, price:pr, order:od, badge:bd, badgeColor:bc}); n++ }
   }
   if(!n){ toast("কোনো পরিবর্তন নেই"); return }
   run(() => b.commit(), n + "টা প্যাকেজ সেভ হয়েছে");
@@ -465,8 +473,10 @@ window.sPL = () => {
 window.aP2 = () => { const n = v("npn").trim(), pr = Number(v("npp"));
   if(!n){toast("নাম লিখুন");return}
   if(!(pr > 0)){toast("সঠিক দাম লিখুন");return}
-  const d = {name:n, label:v("npl").trim(), price:pr, categoryId:cc, order:S.products.filter(p => p.categoryId === cc).length+1, createdAt:serverTimestamp()};
-  clr(["npn","npp","npl"]);
+  const bc = v("npbc").trim();
+  if(bc && !/^#[0-9a-fA-F]{6}$/.test(bc)){toast("ব্যাজের রং ঠিক করুন (যেমন #2563eb)");return}
+  const d = {name:n, label:v("npl").trim(), price:pr, categoryId:cc, order:S.products.filter(p => p.categoryId === cc).length+1, badge:v("npb").trim(), badgeColor:bc, createdAt:serverTimestamp()};
+  clr(["npn","npp","npl","npb","npbc"]);
   run(() => addDoc(collection(db, C.products), d), "প্যাকেজ যোগ হয়েছে") };
 
 /* ---------- নোটিশ, পপ-আপ, ব্যানার ---------- */

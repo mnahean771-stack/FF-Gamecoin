@@ -368,6 +368,16 @@ footer .about h2{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.
   0%,100%{box-shadow:0 0 6px 0 var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
   50%{box-shadow:0 0 14px 3px var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
 }
+
+/* ===== প্যাকেজের উপরের ব্যাজ (POPULAR / LIMITED স্টাইল, অ্যাডমিন থেকে লেখা ও রং, গ্লো সহ) ===== */
+.pk.has-pkb{overflow:visible}
+.pk .pkb{--bc:#2563eb;position:absolute;top:-9px;right:-3px;z-index:6;max-width:calc(100% + 3px);padding:3px 10px;border-radius:7px;background:var(--bc);color:#fff;font-size:10.5px;font-weight:800;line-height:1.2;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.25);box-shadow:0 0 8px 1px var(--bc),0 4px 10px -4px rgba(0,0,0,.4);animation:pkbGlow 2.4s ease-in-out infinite}
+@keyframes pkbGlow{
+  0%,100%{box-shadow:0 0 6px 0 var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
+  50%{box-shadow:0 0 15px 3px var(--bc),0 4px 10px -4px rgba(0,0,0,.4)}
+}
+.pk-grid{padding-top:10px}
+#dynView .pk .pkb,#uidView .pk .pkb,#wmView .pk .pkb,#wlView .pk .pkb,#luView .pk .pkb,#inView .pk .pkb{pointer-events:none}
 /* ===== উপরের হেডার বার চিকন (ছোট লোগো, ওয়ালেট ও প্রোফাইল) ===== */
 .hd{height:54px !important}
 .logo{height:36px !important;max-width:125px !important}
@@ -3579,7 +3589,7 @@ function paint(cats, prods, groups){
       b.dataset.name = p.name || ""; b.dataset.price = Number(p.price) || 0;
       const s = document.createElement("span"); s.textContent = shown(p);
       const m = document.createElement("b"); m.textContent = "BDT " + (Number(p.price) || 0);
-      b.append(s, m); grid.appendChild(b);
+      b.append(s, m); window.ffSetPkBadge(b, p.badge, p.badgeColor); grid.appendChild(b);
     });
     if (!grid.__single) { grid.__single = true; keepSingleSelection(grid); }
     const card = document.querySelector('a.card[data-open="' + CARDS[cid] + '"]');
@@ -3632,6 +3642,18 @@ window.ffSetBadge = function(card, text, color){
   const bc = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#2563eb';
   b.style.background = bc;
   b.style.setProperty('--bc', bc);
+};
+
+window.ffSetPkBadge = function(btn, text, color){
+  if (!btn) return;
+  let b = btn.querySelector('.pkb');
+  text = String(text || '').trim();
+  if (!text) { if (b) b.remove(); btn.classList.remove('has-pkb'); return; }
+  if (!b) { b = document.createElement('span'); b.className = 'pkb'; btn.appendChild(b); }
+  b.textContent = text;
+  const bc = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#2563eb';
+  b.style.setProperty('--bc', bc);
+  btn.classList.add('has-pkb');
 };
 function renderCatalog(cats, prods, groups){
   window.__ffCat = {cats, prods, groups};
@@ -3744,7 +3766,7 @@ function dynRoute(){
     b.dataset.name = p.name || ""; b.dataset.price = Number(p.price) || 0;
     const s = document.createElement("span"); s.textContent = shown(p);
     const q = document.createElement("b"); q.textContent = "BDT " + (Number(p.price) || 0);
-    b.append(s, q); grid.appendChild(b);
+    b.append(s, q); window.ffSetPkBadge(b, p.badge, p.badgeColor); grid.appendChild(b);
   });
   const nb = $d("dynNoteBox"), nl = $d("dynNote"); nl.innerHTML = "";
   let lines = String(c.note || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
